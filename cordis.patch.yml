@@ -1,0 +1,35 @@
+# Rows this bundle contributes to the profile composition.
+#
+# 1. The picker backend swap.
+#    The shipped `directory-picker` row is `dsh-host-directory-picker-auto`,
+#    which resolves on a Windows workstation to the NATIVE backend. The native
+#    backend implements only the OS chooser (`pick`), not the listing primitives
+#    (`list` / `createDirectory`), so an in-app explorer cannot read a directory
+#    level at all. This bundle therefore pins the seam to its browse backend:
+#    the auto chooser is switched off and the browse host backend plus the
+#    shipped browse surface are composed in its place. With our picker module
+#    switched off, the shipped in-app dialog still fills the directory holes,
+#    so "Add workspace" keeps working in both states.
+#
+#    Both backends register the same `ctx.directoryPicker` service, so the auto
+#    row MUST be disabled rather than kept: the chooser and a concrete backend
+#    mounted together fail loud (duplicate service, duplicate flow in a single
+#    hole).
+#
+# 2. This bundle's own row: host half from `lib/index.js`, browser half attached
+#    through the package.json `dsh.client` declaration.
+- id: directory-picker
+  disabled: true
+
+- insert:
+    - id: workspace-suite-directory-picker-browse
+      name: '@deepseek-ai/dsh-host-directory-picker-browse'
+      config: {}
+
+    - id: workspace-suite-directory-picker-browse-ui
+      name: '@deepseek-ai/dsh-client-ui-directory-picker-browse'
+      config: {}
+
+    - id: workspace-suite
+      name: dsh-client-ui-workspace-suite
+      config: {}
