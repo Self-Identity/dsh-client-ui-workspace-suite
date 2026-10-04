@@ -426,7 +426,7 @@
             openWorkspace(workspace.workspaceId)
           },
         }, [
-          E('span', { key: 'folder', className: 'dws-folderIcon' },
+          E('span', { key: 'folder', className: 'dws-folderIcon' + (expanded ? ' dws-folderIcon--active' : '') },
             icon(expanded ? 'IconFolderOpenRegular' : 'IconFolderCloseRegular', 16)),
           E(MarqueeTitle, {
             key: 'text',

@@ -43,7 +43,7 @@ const bootRecord = (records) => {
 
 /* ------------------------------- fake React ------------------------------- */
 
-const HOOK_GUARD = { depth: 0, allowEffects: false }
+const HOOK_GUARD = { depth: 0, allowEffects: false, calls: 0 }
 
 function fakeReact() {
   const React = {
@@ -60,18 +60,23 @@ function fakeReact() {
       return { $$element: true, type, props: props || {}, children: children.flat(Infinity) }
     },
     useState(init) {
+      HOOK_GUARD.calls += 1
       return [typeof init === 'function' ? init() : init, () => {}]
     },
     useRef(value) {
+      HOOK_GUARD.calls += 1
       return { current: value }
     },
     useMemo(factory) {
+      HOOK_GUARD.calls += 1
       return factory()
     },
     useCallback(fn) {
+      HOOK_GUARD.calls += 1
       return fn
     },
     useEffect(fn) {
+      HOOK_GUARD.calls += 1
       if (HOOK_GUARD.allowEffects) {
         try {
           fn()
@@ -83,6 +88,7 @@ function fakeReact() {
     },
     useLayoutEffect() {},
     useSyncExternalStore(_subscribe, getSnapshot) {
+      HOOK_GUARD.calls += 1
       return getSnapshot()
     },
     useContext() {
@@ -126,6 +132,9 @@ const storeKit = {
   notifySubscribers: () => {},
 }
 
+/** Props the host Menu received, for the placement assertions. */
+const menuProps = []
+
 const primitivesProxy = new Proxy({}, {
   get(_target, name) {
     if (typeof name !== 'string') return undefined
@@ -136,7 +145,10 @@ const primitivesProxy = new Proxy({}, {
     if (name === 'Tooltip') return (props) => (props && props.children !== undefined ? props.children : null)
     // Rendered whether or not the menu is open, so the row chrome inside it is
     // covered by the assertions without simulating a click on every trigger.
-    if (name === 'Menu') return (props) => (props && props.children !== undefined ? props.children : null)
+    if (name === 'Menu') return (props) => {
+      menuProps.push(props)
+      return props && props.children !== undefined ? props.children : null
+    }
     if (name === 'Modal') return (props) => (props && props.open === false ? null : (props && props.children) || null)
     // Menu rows carry their icon and their localized shortcut hint, so surface both
     // as data attributes for the assertions instead of rendering them.
@@ -545,6 +557,29 @@ for (const { options, component } of registrations) {
       fail('the picker tree has no keyboard handler; arrow keys would not navigate it')
     } else {
       console.log('  picker tree: focusable treeitem rows with a keyboard handler')
+    }
+    // Hooks must run unconditionally: the closed render and the open render have to
+    // call the same number of hooks, or React tears the pane down with "rendered
+    // more hooks than during the previous render" — the whole list then goes blank.
+    const hookCalls = (props) => {
+      const start = HOOK_GUARD.calls
+      const probe = { depth: 0, nodes: 0, strings: [], elements: [] }
+      try {
+        render(component(props), probe)
+      } catch (error) {
+        fail('the picker threw with open=' + String(props.open) + ': '
+          + String(error && error.message ? error.message : error))
+      }
+      return HOOK_GUARD.calls - start
+    }
+    const closedCalls = hookCalls({ ...baseProps, open: false })
+    const openCalls = hookCalls({ ...baseProps, open: true })
+    if (openCalls === 0) fail('the picker hook probe measured no hooks at all')
+    else if (closedCalls !== openCalls) {
+      fail('the picker calls ' + String(openCalls) + ' hooks when open but ' + String(closedCalls)
+        + ' when closed; a conditional hook blanks the whole pane')
+    } else {
+      console.log('  picker hooks: ' + String(openCalls) + ' in both the closed and the open render')
     }
   }
   if (options.name === 'main') {
@@ -984,6 +1019,29 @@ if (problems.length === 0) {
           + String(folders) + ' folder icon(s), 0 session rows')
       }
     }
+  }
+}
+
+/* --------------------------- menu placement ------------------------------- */
+
+// A portaled host list is placed from the anchor rect its owner supplies. Without
+// one the list renders unpinned at the window's origin (reported in the client as
+// "the menu flew to the top-left corner").
+{
+  const placements = menuProps.filter((props) => props !== null && typeof props === 'object')
+  if (placements.length === 0) fail('no host Menu received props at all')
+  else {
+    const missing = placements.filter((props) => typeof props.getAnchorRect !== 'function')
+    if (missing.length > 0) {
+      fail(missing.length + ' of ' + placements.length + ' host menus got no getAnchorRect')
+    } else {
+      console.log('menu placement: ' + String(placements.length) + ' host menu(s) supply an anchor rect')
+    }
+    const badSide = placements.filter((props) => props.side !== 'bottom' && props.side !== 'top')
+    if (badSide.length > 0) fail('a host menu received an unsupported side: ' + JSON.stringify(badSide[0].side))
+    const domAnchor = placements.filter((props) => props.anchor === null || typeof props.anchor !== 'object'
+      || props.anchor.$$element !== true)
+    if (domAnchor.length > 0) fail('a host menu received something other than a React element as its anchor')
   }
 }
 

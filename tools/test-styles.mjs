@@ -34,8 +34,15 @@ const css = source.slice(start, end)
 /* ------------------------------ colours ---------------------------------- */
 
 const colourLiteral = /:\s*(#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(|\b(?:white|black|red|blue|green|gray|grey|orange|yellow|purple|pink|brown)\b)/g
-for (const match of css.matchAll(colourLiteral)) {
-  fail('literal colour in the stylesheet (breaks one of the two appearances): ' + match[0].trim())
+// Two surfaces are deliberately outside the theme: the shipped hover card paints
+// its own dark background in both appearances (so its text is fixed white/grey),
+// and the picker's hover row is the theme's business blue with inverse text.
+const INVERSE_PALETTE = /dws-hoverCard|dws-pickerRow/
+for (const chunk of css.split('}')) {
+  if (INVERSE_PALETTE.test(chunk)) continue
+  for (const match of chunk.matchAll(colourLiteral)) {
+    fail('literal colour in the stylesheet (breaks one of the two appearances): ' + match[0].trim())
+  }
 }
 
 const variables = new Set()

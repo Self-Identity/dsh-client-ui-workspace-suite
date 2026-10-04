@@ -303,14 +303,29 @@
       const [rect, setRect] = React.useState(null)
       const [hostMenuFailed, setHostMenuFailed] = React.useState(false)
       const triggerRef = React.useRef(null)
-      const onClick = (event) => {
+      // The portaled host list is positioned from this rect. It is captured from the
+      // click itself rather than read off a ref: the host may re-clone the anchor
+      // element, which replaces any ref this plugin attached, and without a rect the
+      // list opens unpositioned in the window's top-left corner.
+      const anchorRectRef = React.useRef(null)
+      const onClick = React.useCallback((event) => {
         event.preventDefault()
         event.stopPropagation()
-        const node = triggerRef.current
-        if (node !== null) setRect(node.getBoundingClientRect())
+        const node = event.currentTarget
+        if (node !== null && node !== undefined && typeof node.getBoundingClientRect === 'function') {
+          const measured = node.getBoundingClientRect()
+          anchorRectRef.current = measured
+          setRect(measured)
+        }
         setOpen((value) => !value)
-      }
-      const trigger = triggerLabel === undefined
+      }, [])
+      const getAnchorRect = React.useCallback(() => anchorRectRef.current, [])
+      // The trigger element is memoized: handing the host menu a brand-new element
+      // on every render makes it re-anchor and re-run its focus handoff mid-click,
+      // which is what swallowed the first selection.
+      const triggerIconName = triggerIcon === undefined ? 'IconFlatListOutlineRegular' : triggerIcon
+      const blocked = disabled === true || items.length === 0
+      const trigger = React.useMemo(() => (triggerLabel === undefined
         ? E('button', {
           ref: triggerRef,
           type: 'button',
@@ -318,7 +333,7 @@
           'aria-label': label,
           'aria-haspopup': 'menu',
           'aria-expanded': open ? 'true' : 'false',
-          disabled: disabled === true || items.length === 0,
+          disabled: blocked,
           onClick,
         }, icon(iconName || 'IconEllipsisOutlineRegular', 16))
         : E('button', {
@@ -329,13 +344,13 @@
           'aria-label': label,
           'aria-haspopup': 'menu',
           'aria-expanded': open ? 'true' : 'false',
-          disabled: disabled === true || items.length === 0,
+          disabled: blocked,
           onClick,
         }, [
-          icon(triggerIcon === undefined ? 'IconFlatListOutlineRegular' : triggerIcon, 14),
+          icon(triggerIconName, 14),
           E('span', { key: 'label', className: 'dws-ellipsis', style: { maxWidth: '180px' } }, triggerLabel),
           icon('IconChevronDownOutlineRegular', 12),
-        ])
+        ])), [blocked, iconName, label, onClick, open, triggerIconName, triggerLabel])
       const close = React.useCallback(() => setOpen(false), [])
       const choose = (id) => {
         close()
@@ -370,6 +385,9 @@
         side: side === 'top' ? 'top' : 'bottom',
         align: 'start',
         anchor: trigger,
+        // Portal mode places the list from the anchor rect the owner supplies; with
+        // no rect the host list renders unpinned at the window's origin.
+        getAnchorRect,
         items: rows === undefined ? items : [],
         onSelect: choose,
         ...(footer === undefined ? {} : { footer }),

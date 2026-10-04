@@ -75,11 +75,30 @@
       const [showHidden, setShowHidden] = React.useState(false)
       const [pathDraft, setPathDraft] = React.useState(null)
       const [error, setError] = React.useState(null)
-      const [breakRequest, setBreakRequest] = React.useState(null)
       const [creating, setCreating] = React.useState(false)
       const cache = React.useMemo(() => createListingCache(listDirectory), [listDirectory])
       const generation = React.useRef(0)
       const treeRef = React.useRef(null)
+      // Click bookkeeping for the shortened double-click window. This MUST be a hook
+      // call in every render, so it lives here with the other hooks — placing it
+      // after the `open !== true` early return made the hook count differ between
+      // the closed and open renders, which crashed the sidebar into a blank pane.
+      const ROW_DOUBLE_CLICK_MS = 250
+      const lastClickRef = React.useRef({ key: null, at: 0 })
+      const clickHandler = (key, onSingle, onDouble) => (event) => {
+        const now = Date.now()
+        const previous = lastClickRef.current
+        if (previous.key === key && now - previous.at <= ROW_DOUBLE_CLICK_MS) {
+          lastClickRef.current = { key: null, at: 0 }
+          if (onDouble !== undefined) {
+            event.preventDefault()
+            onDouble()
+            return
+          }
+        }
+        lastClickRef.current = { key, at: now }
+        if (onSingle !== undefined) onSingle()
+      }
 
       // Remarks of already-registered workspaces come from the root hook the
       // slot kit provides; the sidebar passes its own hook so the two agree.
@@ -235,7 +254,6 @@
         setFilter('')
         setPathDraft(null)
         setError(null)
-        setBreakRequest(null)
         const rootKey = '::root::'
         setExpanded(new Set([rootKey]))
         /** Publish one synthetic root level (drive list, or the home fallback). */
@@ -321,27 +339,18 @@
       const rootKey = '::root::'
       const isSelected = (path) => selected.has(foldPath(path))
 
-      /** Selected direct or indirect descendants of one path. */
-      const selectedDescendants = (path) => {
-        const out = []
-        for (const key of selected.keys()) {
-          const entry = selected.get(key)
-          if (isAncestorPath(path, entry.path)) out.push(key)
-        }
-        return out
-      }
-
       const toggleSelect = (path, remark) => {
         const key = foldPath(path)
         if (selected.has(key)) {
-          const descendants = selectedDescendants(path)
-          if (descendants.length > 0) {
-            setBreakRequest({ path, descendants })
-            return
-          }
+          // Unchecking a parent unchecks everything selected beneath it in the same
+          // click, so a selection can never keep an orphaned child without its
+          // parent (the tree structure the preview draws would be broken).
           setSelected((previous) => {
-            const next = new Map(previous)
-            next.delete(key)
+            const next = new Map()
+            for (const [entryKey, value] of previous) {
+              if (entryKey === key || isAncestorPath(path, value.path)) continue
+              next.set(entryKey, value)
+            }
             return next
           })
           return
@@ -414,11 +423,7 @@
             'data-path': entry.path,
             tabIndex: -1,
             title: entry.path,
-            onClick: () => toggle(entry.path),
-            onDoubleClick: (event) => {
-              event.preventDefault()
-              toggleSelect(entry.path)
-            },
+            onClick: clickHandler(foldPath(entry.path), () => toggle(entry.path), () => toggleSelect(entry.path)),
           }, [
             E('button', {
               key: 'chev',
@@ -649,9 +654,8 @@
                   key: 'name',
                   className: 'dws-previewName',
                   title: entry.path,
-                  onDoubleClick: (event) => {
-                    event.preventDefault()
-                    setBreakRequest(null)
+                  // Same shortened double-click window as the tree rows.
+                  onClick: clickHandler('preview:' + foldPath(entry.path), undefined, () => {
                     setSelected((previous) => {
                       const next = new Map(previous)
                       const key = foldPath(entry.path)
@@ -659,7 +663,7 @@
                       next.set(key, { ...current, editing: true })
                       return next
                     })
-                  },
+                  }),
                 }, entry.editing === true
                   ? [E('input', {
                     key: 'edit',
@@ -723,28 +727,5 @@
           closeLabel: t('common.close'),
           className: 'dws-dialog dws-picker',
           footer,
-        }, body),
-        breakRequest === null ? null : E(SuiteModal, {
-          open: true,
-          onClose: () => setBreakRequest(null),
-          title: t('picker.confirm.break'),
-          closeLabel: t('common.close'),
-          footer: E('div', { style: { display: 'flex', gap: '8px', justifyContent: 'flex-end' } }, [
-            E(SuiteButton, { key: 'keep', onClick: () => setBreakRequest(null) }, t('picker.confirm.keep')),
-            E(SuiteButton, {
-              key: 'remove',
-              variant: 'primary',
-              onClick: () => {
-                const request = breakRequest
-                setBreakRequest(null)
-                setSelected((previous) => {
-                  const next = new Map(previous)
-                  next.delete(foldPath(request.path))
-                  return next
-                })
-              },
-            }, t('picker.confirm.remove')),
-          ]),
-        }, E('div', { style: { fontSize: '13px', lineHeight: '20px' } },
-          t('picker.confirm.breakBody', { name: baseName(breakRequest.path) }))))
+        }, body))
     }

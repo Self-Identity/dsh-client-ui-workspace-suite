@@ -93,6 +93,8 @@
       '.dws-chev--empty{visibility:hidden}',
       '.dws-folderIcon{flex:none;display:inline-flex;align-items:center;justify-content:center;width:16px;height:20px;',
       'color:var(--dsw-alias-label-tertiary)}',
+      // Expanded folders take the theme's business blue, exactly like the shipped
+      // row's active folder; a collapsed folder keeps the resting colour.
       '.dws-folderIcon--active{color:var(--dsw-alias-state-business-primary)}',
       '.dws-slot{flex:none;display:inline-flex;align-items:center;justify-content:center;width:16px;height:20px;',
       'color:var(--dsw-alias-label-tertiary)}',
@@ -116,9 +118,13 @@
       '.dws-fade{position:absolute;left:0;right:var(--dsh-session-list-edge-inset,0px);bottom:0;height:24px;',
       'pointer-events:none;background:linear-gradient(to bottom,transparent,var(--dsw-specific-sidebar-fill))}',
       '.dws-hoverCard{box-sizing:border-box;max-width:320px;display:flex;flex-direction:column;gap:2px;padding:8px 10px;',
-      'color:var(--dsw-alias-label-primary);font-size:12px;line-height:17px}',
-      '.dws-hoverCard .dws-muted,.dws-hoverCard .dws-secondary{color:var(--dsw-alias-label-secondary)}',
-      '.dws-hoverCard strong{font-size:13px;font-weight:510;color:var(--dsw-alias-label-primary)}',
+      // The shipped hover card paints its own dark surface in BOTH appearances, so
+      // its text palette is fixed: white title, light-grey body, grey meta. Theme
+      // label tokens would go dark-on-dark in the light appearance.
+      'color:#cfd3d6;font-size:12px;line-height:17px}',
+      '.dws-hoverCard .dws-muted,.dws-hoverCard .dws-secondary,.dws-hoverCard .dws-modelName{color:#adb2b8}',
+      '.dws-hoverCard .dws-modelValue{color:#cfd3d6}',
+      '.dws-hoverCard strong{font-size:14px;font-weight:510;line-height:20px;color:#fff}',
       '.dws-hoverLine{overflow-wrap:anywhere}',
       // Rename field, styled like the shipped rename dialog's input.
       '.dws-renameInput{box-sizing:border-box;width:100%;border:.5px solid var(--dsw-alias-border-l4);',
@@ -161,18 +167,22 @@
       '.dws-crumb:hover{color:var(--dsw-alias-label-primary)}',
       '.dws-dialogBody{flex:1 1 auto;min-height:0;min-width:0;display:flex;flex-direction:column}',
       '.dws-dialogToolbar{flex:none;display:flex;align-items:center;gap:8px;padding:8px 14px 8px 24px;min-width:0}',
-      '.dws-pickerTree{flex:1 1 auto;min-height:0;overflow:auto;padding:0 10px 8px 18px}',
+      '.dws-pickerTree{flex:1 1 auto;min-height:0;max-height:min(46vh,420px);overflow-y:auto;overflow-x:hidden;',
+      'padding:0 10px 8px 18px}',
       '.dws-pickerTree::-webkit-scrollbar{width:5px}',
       '.dws-pickerTree::-webkit-scrollbar-thumb{background:var(--dsw-alias-scrollbar-bg-l2);border-radius:3px}',
       '.dws-pickerTree::-webkit-scrollbar-track{background:transparent}',
       '.dws-pickerRow{box-sizing:border-box;display:flex;align-items:center;gap:6px;min-height:28px;padding:2px 8px;',
       'padding-inline-start:calc(8px + var(--suite-indent,0px));border-radius:var(--dsw-radius-sm);cursor:pointer;',
       'color:var(--dsw-alias-label-primary)}',
-      '.dws-pickerRow:hover{background:var(--dsw-alias-interactive-bg-hover)}',
+      // Hover is the theme's business blue with inverse text (a solid, deep
+      // highlight); selection stays the pale document-selection blue.
+      '.dws-pickerRow:hover{background:var(--dsw-alias-state-business-primary);color:#fff}',
       '.dws-pickerRow--selected{background:var(--dsw-alias-bg-document-selection)}',
+      '.dws-pickerRow--selected:hover{background:var(--dsw-alias-state-business-primary);color:#fff}',
       '.dws-pickerName{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;',
       'line-height:20px}',
-      '.dws-pickerScroll{flex:none;max-height:38%;min-height:0;display:flex;flex-direction:column;',
+      '.dws-pickerScroll{flex:none;max-height:min(22vh,200px);min-height:0;display:flex;flex-direction:column;',
       'border-top:.5px solid var(--dsw-alias-border-l3)}',
       '.dws-previewHead{flex:none;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 24px 4px;',
       'color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px}',

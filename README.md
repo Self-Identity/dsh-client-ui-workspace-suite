@@ -86,6 +86,13 @@ DSH 官方客户端（Electron 桌面版）的工作区套件插件：把「工�
 | 菜单项 | 行改成原生 `MenuItemButton`（**图标 + 快捷键提示 + `danger` 危险色**）；快捷键按 id 从 `useShortcuts` 取（`session.rename` / `session.fork` / `session.archive` / `session.new` / `workspace.add`），取不到就只显示图标 |
 | 选择弹窗滚动条 | 树区 `overflow:auto` 并补 5px 可见滚动条（thumb 用 `--dsw-alias-scrollbar-bg-l2`） |
 | 列表高度 | 列表**填满**到最下方账号行并在内部滚动（原生行为）；设置项「工作区树最大高度」默认改为 **100**，调低才会限高 |
+| 选择弹窗滚动条 | 树区 `overflow-y:auto` 并补 5px 可见滚动条；**关键**：原生 `Modal` 的 DOM 是 `dialog > content > body(children)`，中间那层不是本插件能控的 flex 容器，所以树区改用视口相对限高 `max-height:min(46vh,420px)`，保证一定出现内部滚动（只写 `flex:1;min-height:0` 会完全不滚动）；底部预览区限高 `min(22vh,200px)` |
+| 弹窗选中/悬浮配色 | 悬浮 = 主题业务蓝（`--dsw-alias-state-business-primary`）+ 反白文字；选中 = 淡蓝（`--dsw-alias-bg-document-selection`） |
+| 取消父节点选中 | **连带取消其全部已选子节点**（同一击完成，用已测试的 `isAncestorPath` 过滤），不再弹"保留/移除"确认框；该确认框已成死代码，已连同未使用的 `selectedDescendants` 一并删除 |
+| 双击判定区间 | 不再依赖平台默认（Windows ~500ms）：自绘判定窗口 **250ms**；第一击仍执行单击动作，窗口内的第二击才触发双击动作（弹窗树行的"展开/勾选"与预览区"重命名"都走它），顺带修掉原来"双击 = 展开+收起+勾选"三连动作的问题 |
+| 工作区悬浮提示配色 | 照抄出厂：卡片是**两个外观下都固定的深色面**，文字用固定浅色 `#fff` / `#cfd3d6` / `#adb2b8`（用主题 label token 会在浅色外观下变成黑字压黑底，即"名称与背景重叠"）；`test-styles` 的颜色字面量禁令为这两处（悬停卡 + 弹窗悬浮行）开了**具名例外** |
+| 展开文件夹图标 | 展开时加 `dws-folderIcon--active`（`--dsw-alias-state-business-primary`，DSH 主题蓝），未展开保持原灰 |
+| 「更多」首次点击失效 | 触发器元素与点击回调改为 `useMemo`/`useCallback` **稳定化**：宿主菜单若每次渲染都收到新元素，会重新锚定并重跑焦点交接，从而吃掉第一次选择 |
 
 > 两个由测试桩抓到的真实缺陷（真机同样会出问题）：把 `children` 当 **props 字段**传给宿主组件会被渲染器自身的 children 覆盖（必须用位置参数）；`Menu` 的 `anchor` 必须是**元素**而不是 DOM 节点。
 
