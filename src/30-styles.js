@@ -101,6 +101,26 @@
       '.dws-title{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;',
       'line-height:20px}',
       '.dws-title--workspace{font-weight:510}',
+      // A deliberate small gap between a workspace's remark name and its grey original
+      // name, and between a session's leading icon and its title (the shipped session
+      // row insets the title the same way).
+      '.dws-title--workspace{gap:6px}',
+      '.dws-wsRow .dws-original{margin-inline-start:6px}',
+      '.dws-sessionRow .dws-title{margin:0 6px 0 4px}',
+      // Chart frame: a y axis of value ticks, the plot, and an x axis of days.
+      '.dws-chart{display:flex;gap:8px;min-width:0}',
+      '.dws-chartY{flex:none;display:flex;flex-direction:column;justify-content:space-between;align-items:flex-end;',
+      'height:150px;font-size:11px;line-height:14px;color:var(--dsw-alias-label-tertiary);font-variant-numeric:tabular-nums}',
+      '.dws-chartPlot{flex:1 1 auto;min-width:0;display:flex;flex-direction:column}',
+      '.dws-chartX{display:flex;justify-content:space-between;gap:8px;margin-top:4px;font-size:11px;line-height:14px;',
+      'color:var(--dsw-alias-label-tertiary);font-variant-numeric:tabular-nums}',
+      // Turn rows: the session row shape one level deeper, without a token figure.
+      '.dws-turnRow{box-sizing:border-box;display:flex;align-items:center;gap:6px;height:26px;min-width:0;padding:0 8px;',
+      'padding-inline-start:calc(8px + var(--suite-indent,0px));border-radius:var(--dsw-radius-sm);cursor:pointer;',
+      'color:var(--dsw-alias-label-secondary);font-size:12px;line-height:18px}',
+      '.dws-turnRow:hover{background:var(--dsw-alias-interactive-bg-hover)}',
+      '.dws-turnIndex{flex:none;color:var(--dsw-alias-label-tertiary);font-variant-numeric:tabular-nums}',
+      '.dws-turnTitle{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
       // Hover marquee masks, copied from the shipped rows: the title clips its own
       // text, crawls left while hovered and publishes data-scrolled / data-clipped
       // so the text fades on whichever side still has content hidden.
@@ -217,18 +237,26 @@
       '.dws-statRow{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;min-width:0}',
       '.dws-statValue{font-size:16px;line-height:24px;font-weight:510;font-variant-numeric:tabular-nums}',
       '.dws-statLabel{font-size:12px;line-height:18px;color:var(--dsw-alias-label-tertiary)}',
-      '.dws-chart{display:flex;flex-direction:column;gap:6px;min-width:0}',
       '.dws-chartBars{display:flex;align-items:flex-end;gap:3px;height:150px;min-width:0;overflow-x:auto;overflow-y:hidden;',
       'padding-bottom:2px}',
-      '.dws-chartBar{flex:1 1 0;min-width:6px;max-width:36px;border-radius:3px 3px 0 0;background:var(--dsw-alias-state-business-primary);',
+      '.dws-chartBar{flex:1 1 0;min-width:4px;border-radius:3px 3px 0 0;background:var(--dsw-alias-state-business-primary);',
       'opacity:.75;cursor:pointer;transition:opacity .12s ease}',
       '.dws-chartBar:hover{opacity:1}',
       '.dws-chartAxis{display:flex;justify-content:space-between;gap:8px;font-size:11px;line-height:16px;',
       'color:var(--dsw-alias-label-tertiary);min-width:0}',
-      '.dws-chartCell{flex:1 1 0;min-width:6px;max-width:36px;display:flex;flex-direction:column;justify-content:flex-end;height:150px}',
-      '.dws-chartBarWrap{flex:1 1 0;min-width:6px;max-width:36px;height:150px;display:flex;align-items:flex-end;cursor:pointer}',
+      '.dws-chartCell{flex:1 1 0;min-width:4px;display:flex;flex-direction:column;justify-content:flex-end;height:150px}',
+      // Bars stretch to fill the plot width (no per-bar cap), so seven days and
+      // thirty days both reach the container edges.
+      '.dws-chartBarWrap{flex:1 1 0;min-width:4px;height:150px;display:flex;align-items:flex-end;cursor:pointer}',
+      // Each bar sits inside the host hover-card wrapper, so stretch whatever element
+      // that wrapper is: this is what makes seven bars fill the whole plot width.
+      '.dws-chartBars>*{flex:1 1 0;min-width:0}',
       '.dws-chartFill{width:100%;border-radius:3px 3px 0 0;background:var(--dsw-alias-state-business-primary);opacity:.8}',
       '.dws-chartFill:hover{opacity:1}',
+      // A turn title that overflows fades out at its right edge instead of ending
+      // on a hard cut.
+      '.dws-turnTitle{-webkit-mask-image:linear-gradient(270deg,#0000,#000 12px);',
+      'mask-image:linear-gradient(270deg,#0000,#000 12px);text-overflow:clip}',
       '.dws-modelList{display:flex;flex-direction:column;gap:4px;min-width:0}',
       '.dws-modelRow{display:flex;align-items:center;gap:8px;min-width:0;font-size:12px;line-height:18px}',
       '.dws-modelName{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',

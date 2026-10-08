@@ -127,6 +127,9 @@ check('chain of an empty path', chainForPath({ crumbs: [] }, ''), [])
 
 /* -------------------------------- formatting ------------------------------ */
 
+// Badges print the compact figure (1500 -> 1.5K, 15000000 -> 15M); every other
+// token surface (hover cards, model rows, totals line, chart ticks) goes through
+// formatCount and prints exact digits with thousands separators.
 check('formatTokens small', formatTokens(999), '999')
 check('formatTokens thousands', formatTokens(1500), '1.5K')
 check('formatTokens ten-thousands', formatTokens(15400), '15K')

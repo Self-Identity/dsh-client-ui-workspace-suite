@@ -46,6 +46,27 @@
         }
       })()
       const shortcutOf = (id) => shortcutPairs.find((row) => row !== null && typeof row === 'object' && row.id === id)
+      // Fast rename detection, shared with the picker: a second click on a row's NAME
+      // inside RENAME_DOUBLE_CLICK_MS opens rename, while a second click anywhere else
+      // runs the row's other double-click action. The single click keeps its current
+      // meaning, so nothing feels delayed.
+      const fastClickRef = React.useRef({ key: null, at: 0 })
+      const rowClick = (key, onSingle, onName, onBody) => (event) => {
+        const now = Date.now()
+        const previous = fastClickRef.current
+        const target = event.target
+        const onNameCell = target !== null && target !== undefined && typeof target.closest === 'function'
+          && target.closest('[data-row-name]') !== null
+        if (previous.key === key && now - previous.at <= RENAME_DOUBLE_CLICK_MS) {
+          fastClickRef.current = { key: null, at: 0 }
+          event.preventDefault()
+          if (onNameCell && onName !== undefined) onName()
+          else if (onBody !== undefined) onBody()
+          return
+        }
+        fastClickRef.current = { key, at: now }
+        onSingle()
+      }
       const view = React.useSyncExternalStore(viewStore.subscribe, viewStore.getSnapshot)
       const [query, setQuery] = React.useState('')
       const [searchOpen, setSearchOpen] = React.useState(false)
@@ -285,18 +306,18 @@
           style: { '--suite-indent': String(depth * 12) + 'px' },
           role: 'treeitem',
           'aria-selected': row.id === currentSessionId ? 'true' : 'false',
-          onDoubleClick: (event) => {
-            event.preventDefault()
-            event.stopPropagation()
-            setDialog({ kind: 'rename-session', id: row.id, draft: title })
-          },
-          onClick: () => {
-            if (row.archived) {
-              showNotice(t('browser.archived'))
-              return
-            }
-            openSession(row.id)
-          },
+          onClick: rowClick(
+            'session:' + row.id,
+            () => {
+              if (row.archived) {
+                showNotice(t('browser.archived'))
+                return
+              }
+              openSession(row.id)
+            },
+            () => setDialog({ kind: 'rename-session', id: row.id, draft: title }),
+            () => openSession(row.id),
+          ),
         }, [
           leading,
           E(MarqueeTitle, { key: 'title', className: 'dws-title', title }, title),
@@ -405,9 +426,18 @@
           // affordance: Enter/Space toggle, arrows expand and collapse.
           tabIndex: 0,
           title: workspace.path,
-          // Tree semantics, as asked: the row itself expands and collapses, and
-          // the open-folder icon appears only once it is expanded.
-          onClick: () => setExpanded(workspace.workspaceId, !expanded),
+          // Tree semantics: the row itself expands and collapses; a second click on
+          // the name renames and one elsewhere opens the workspace.
+          onClick: rowClick(
+            'ws:' + workspace.workspaceId,
+            () => setExpanded(workspace.workspaceId, !expanded),
+            () => setDialog({
+              kind: 'rename-workspace',
+              id: workspace.workspaceId,
+              draft: customTitle.length > 0 ? customTitle : baseName(workspace.path),
+            }),
+            () => openWorkspace(workspace.workspaceId),
+          ),
           onKeyDown: (event) => {
             const key = event.key
             if (key === 'Enter' || key === ' ' || key === 'Spacebar') {

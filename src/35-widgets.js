@@ -129,12 +129,14 @@
     }
 
     /** Host hover card when available; the anchor alone otherwise. */
-    function SuiteHover({ anchor, content, disabled }) {
+    function SuiteHover({ anchor, content, disabled, immediate }) {
       if (!hasPrimitive('HoverCard')) return anchor
       return E(ui.HoverCard, {
         anchor,
         content,
-        openDelayMs: 500,
+        // Data marks (chart bars) open at once; text rows keep the shipped dwell so
+        // a pointer crossing a list does not flash cards.
+        openDelayMs: immediate === true ? 0 : 500,
         disabled: disabled === true,
       })
     }
@@ -221,6 +223,9 @@
         title,
         style,
         role,
+        // Marks the name cell: the row's click detector uses it to tell "second
+        // click on the name" (rename) from "second click elsewhere" (open).
+        'data-row-name': 'true',
         'aria-label': ariaLabel,
         onDoubleClick,
         onPointerEnter: marquee.enter,

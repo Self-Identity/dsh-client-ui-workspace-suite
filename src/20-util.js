@@ -212,13 +212,33 @@
 
     /* ------------------------------ formatting ----------------------------- */
 
-    /** Compact token figure: 1234 -> 1.2K, 12345678 -> 12.3M. */
+    /**
+     * Compact token figure for the row/total **badges**: 1500 -> 1.5K,
+     * 15000000 -> 15M. Every other token figure on the overview — hover cards,
+     * model rows, the totals line and the chart ticks — uses {@link formatCount}
+     * and prints exact digits with thousands separators.
+     */
     function formatTokens(value) {
       const n = typeof value === 'number' && Number.isFinite(value) ? value : 0
       if (n < 1000) return String(n)
       if (n < 1000000) return (n / 1000).toFixed(n < 10000 ? 1 : 0) + 'K'
       return (n / 1000000).toFixed(n < 10000000 ? 1 : 0) + 'M'
     }
+
+    /** Exact figure with thousands separators: 1234567 -> 1,234,567. */
+    function formatCount(value) {
+      const n = typeof value === 'number' && Number.isFinite(value) ? Math.round(value) : 0
+      const text = String(Math.abs(n))
+      const grouped = text.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+      return (n < 0 ? '-' : '') + grouped
+    }
+
+    /**
+     * Double-click window for the rename/toggle gestures, in milliseconds.
+     * Deliberately shorter than the platform default (~500ms on Windows) so a
+     * rename reacts immediately; shared by the list, the picker and the overview.
+     */
+    const RENAME_DOUBLE_CLICK_MS = 300
 
     /** Day key (local) of a timestamp. */
     function dayKey(value) {

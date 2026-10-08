@@ -52,7 +52,7 @@
     function modelSummaryText(models, title) {
       const rows = Object.entries(models)
         .sort((left, right) => sumBuckets(right[1]) - sumBuckets(left[1]))
-        .map(([model, buckets]) => model + ': ' + String(sumBuckets(buckets)))
+        .map(([model, buckets]) => model + ': ' + formatCount(sumBuckets(buckets)))
       return [title].concat(rows).join('\n')
     }
 
@@ -243,11 +243,11 @@
       }, [root === undefined ? '' : root.path, settings.readme, subtreeSessionIds.join(','), warmTicket])
 
       const days = React.useMemo(() => {
-        const keys = Object.keys(subtreeUsage.days).sort()
-        if (range === 'all') return keys
-        const wanted = recentDays(range === 'd30' ? 30 : 7)
-        return wanted.filter((day) => keys.includes(day))
-      }, [subtreeUsage, range])
+        // The window is always the last 7 or 30 calendar days ending today, so the
+        // range control always has an axis and a day without usage reads as zero
+        // instead of dropping out (which used to empty the whole chart).
+        return recentDays(range === 'd30' ? 30 : 7)
+      }, [range])
 
       const dayMax = days.reduce((max, day) => Math.max(max, sumDayModels(subtreeUsage.days[day])), 0)
 
@@ -258,9 +258,8 @@
           .sort((left, right) => sumBuckets(right[1]) - sumBuckets(left[1]))
           .map(([model, buckets], index) => E('div', { key: model + index, className: 'dws-modelRow' }, [
             E('span', { key: 'name', className: 'dws-modelName' }, model),
-            E('span', { key: 'value', className: 'dws-modelValue' }, String(sumBuckets(buckets))),
+            E('span', { key: 'value', className: 'dws-modelValue' }, formatCount(sumBuckets(buckets))),
           ])),
-        E('div', { key: 'hint', className: 'dws-hoverLine dws-muted' }, t('overview.chart.hint')),
       ])
 
       /**
@@ -303,6 +302,22 @@
         const view = usageOf(sessionId)
         const total = view === undefined ? undefined : sumBuckets(view.totals)
         const turns = view === undefined || !Array.isArray(view.turns) ? [] : view.turns
+        // The shipped `turnOutline` projection is the whole-log turn list (turn
+        // number, start seq, bounded prompt preview), so a turn row can name the
+        // prompt that produced it rather than only its number. No outline (or an
+        // older build) degrades to the number label.
+        const outline = (() => {
+          const values = summary.projectionValues
+          const raw = values === undefined || values === null ? undefined : values.turnOutline
+          return Array.isArray(raw) ? raw : []
+        })()
+        const promptOf = (number) => {
+          const indexed = outline.find((item) => item !== null && typeof item === 'object'
+            && Number(item.number) === Number(number))
+          const entry = indexed === undefined ? outline[Number(number) - 1] : indexed
+          const prompt = entry === undefined || entry === null || entry.prompt === undefined ? '' : String(entry.prompt)
+          return prompt.replace(/\s+/g, ' ').trim()
+        }
         const archived = (workspaceState === null ? [] : workspaceState.archivedSessionIds || []).includes(sessionId)
         const pinned = (workspaceState === null ? [] : workspaceState.pinnedSessionIds || []).includes(sessionId)
         const row = E('div', {
@@ -331,22 +346,6 @@
             },
           }, title),
           total === undefined ? null : tokenBadge('tokens', total, view.models || {}, t('overview.sessionTokens')),
-          settings.showTurns === true ? E('span', { key: 'turns', className: 'dws-ovTurns' }, turns.length === 0
-            ? [E('span', { key: 'none', className: 'dws-muted', style: { fontSize: '11px' } }, t('browser.noTurns'))]
-            : [
-              ...turns.slice(-24).map((entry) => E('button', {
-                key: 'turn:' + entry[0],
-                type: 'button',
-                className: 'dws-turnLink',
-                title: t('overview.turn', { n: entry[0] }),
-                onClick: (event) => {
-                  event.preventDefault()
-                  event.stopPropagation()
-                  jumpToTurn(sessionId, entry[0])
-                },
-              }, String(entry[0]))),
-              turns.length > 24 ? E('span', { key: 'more', className: 'dws-muted', style: { fontSize: '11px' } }, '+' + String(turns.length - 24)) : null,
-            ]) : null,
           E('span', { key: 'actions', className: 'dws-rowActions', onClick: (event) => event.stopPropagation(), style: { opacity: 1 } }, [
             RowMenu({
               key: 'menu',
@@ -386,8 +385,35 @@
             }),
           ]),
         ])
-        return row
+        // Turns hang under their session as their own indented rows (a hierarchy,
+        // not a row of numbers) and carry no token figure: the token total belongs
+        // to the session row, which is where the requirement pins it.
+        const turnRows = settings.showTurns !== true || turns.length === 0
+          ? []
+          : turns.slice(-TURN_ROW_LIMIT).map((entry) => E('div', {
+            key: 'ov-turn:' + sessionId + ':' + String(entry[0]),
+            className: 'dws-turnRow',
+            style: { '--suite-indent': String((depth + 1) * 12) + 'px' },
+            role: 'treeitem',
+            'aria-level': depth + 1,
+            // The tooltip carries this turn's prompt in full, not just its number.
+            title: promptOf(entry[0]).length === 0 ? t('overview.turn', { n: entry[0] }) : promptOf(entry[0]),
+            onClick: (event) => {
+              event.preventDefault()
+              jumpToTurn(sessionId, entry[0])
+            },
+          }, [
+            E('span', { key: 'index', className: 'dws-turnIndex' }, '#' + String(entry[0])),
+            E('span', { key: 'label', className: 'dws-turnTitle' }, (() => {
+              const prompt = promptOf(entry[0])
+              return prompt.length === 0 ? t('overview.turn', { n: entry[0] }) : prompt
+            })()),
+          ]))
+        return [row, ...turnRows]
       }
+
+      /** How many turn rows one session may draw before the list stops growing. */
+      const TURN_ROW_LIMIT = 60
 
       const renderWorkspace = (workspace, depth) => {
         const children = tree.childrenOf.get(workspace.workspaceId) || []
@@ -477,8 +503,10 @@
         ])
         const rows = [head]
         for (const id of selfIds) {
-          const row = renderSession(id, depth + 1)
-          if (row !== null) rows.push(row)
+          // Each session contributes its own row plus one nested row per turn.
+          const produced = renderSession(id, depth + 1)
+          if (Array.isArray(produced)) rows.push(...produced.filter((entry) => entry !== null))
+          else if (produced !== null) rows.push(produced)
         }
         for (const child of children) rows.push(...renderWorkspace(child, depth + 1))
         return rows
@@ -492,11 +520,10 @@
             label: t('overview.chart.title'),
             side: 'bottom',
             triggerIcon: 'IconGaugeOutlineRegular',
-            triggerLabel: range === 'all' ? t('overview.chart.rangeAll') : range === 'd30' ? t('overview.chart.range30') : t('overview.chart.range7'),
+            triggerLabel: range === 'd30' ? t('overview.chart.range30') : t('overview.chart.range7'),
             items: [
-              { id: 'd7', label: t('overview.chart.range7') },
-              { id: 'd30', label: t('overview.chart.range30') },
-              { id: 'all', label: t('overview.chart.rangeAll') },
+              { id: 'd7', label: t('overview.chart.range7'), icon: icon('IconDataOutlineRegular', 16) },
+              { id: 'd30', label: t('overview.chart.range30'), icon: icon('IconDataOutlineRegular', 16) },
             ],
             onSelect: (value) => {
               setRange(value)
@@ -504,27 +531,35 @@
             },
           }),
         ]),
-        days.length === 0
-          ? E('div', { key: 'empty', className: 'dws-empty' }, t('overview.chart.empty'))
-          : E('div', { key: 'chart', className: 'dws-chart' }, [
+        E('div', { key: 'chart', className: 'dws-chart' }, [
+          // The value axis: three ticks read off the same scale the bars use.
+          E('div', { key: 'y', className: 'dws-chartY' }, [
+            E('span', { key: 'max' }, formatCount(dayMax)),
+            E('span', { key: 'mid' }, formatCount(Math.round(dayMax / 2))),
+            E('span', { key: 'zero' }, '0'),
+          ]),
+          E('div', { key: 'plot', className: 'dws-chartPlot' }, [
             E('div', { key: 'bars', className: 'dws-chartBars' }, days.map((day) => {
               const models = subtreeUsage.days[day] || {}
               const value = sumDayModels(models)
               const height = dayMax <= 0 ? 0 : Math.max(2, Math.round((value / dayMax) * 140))
-              return E(SuiteHover, {
+              return SuiteHover({
                 key: day,
-                anchor: E('div', { className: 'dws-chartBarWrap', title: day + ' \u00B7 ' + String(value) }, [
+                immediate: true,
+                anchor: E('div', { className: 'dws-chartBarWrap', title: day + ' \u00B7 ' + formatCount(value) }, [
                   E('div', { className: 'dws-chartFill', style: { height: String(height) + 'px' } }),
                 ]),
-                content: modelContent(models, t('overview.chart.day', { date: day }) + ' \u00B7 ' + String(value)),
+                content: modelContent(models, t('overview.chart.day', { date: day }) + ' \u00B7 ' + formatCount(value)),
               })
             })),
-            E('div', { key: 'axis', className: 'dws-chartAxis' }, [
-              E('span', { key: 'from' }, days[0]),
-              E('span', { key: 'label' }, t('overview.chart.axis') + ' \u00B7 \u2264 ' + formatTokens(dayMax)),
-              E('span', { key: 'to' }, days[days.length - 1]),
+            // The day axis: the window's first day, its midpoint and its last day.
+            E('div', { key: 'x', className: 'dws-chartX' }, [
+              E('span', { key: 'from' }, days.length === 0 ? '' : days[0]),
+              E('span', { key: 'mid' }, days.length === 0 ? '' : days[Math.floor(days.length / 2)]),
+              E('span', { key: 'to' }, days.length === 0 ? '' : days[days.length - 1]),
             ]),
           ]),
+        ]),
       ])
 
       const header = E('div', { className: 'dws-pageHeader' }, [
@@ -537,7 +572,7 @@
           ]),
           E('div', { key: 'path', className: 'dws-pagePath dws-muted' }, root === undefined ? '' : root.path),
           E('div', { key: 'note', className: 'dws-pagePath dws-muted' }, [
-            t('overview.totalTokens') + ': ' + String(sumBuckets(subtreeUsage.totals)),
+            t('overview.totalTokens') + ': ' + formatCount(sumBuckets(subtreeUsage.totals)),
             missing > 0 ? ' \u00B7 ' + t('overview.stats.partial') : '',
             degraded ? ' \u00B7 ' + t('overview.stats.fallback') : '',
           ].join('')),
@@ -567,15 +602,20 @@
       // Scroll on the body, centre the cards in a 960px column: the same shape
       // the shipped entry pages use, so the panel cannot rely on a parent height.
       const body = E('div', { className: 'dws-pageBody' }, [E('div', { key: 'inner', className: 'dws-pageInner' }, [
-        chart,
+        // A workspace with no session has nothing to chart: say so instead of
+        // rendering an empty frame, which read as a blank page.
+        sessionIdsOf(subtreeIds).length === 0
+          ? E('div', { key: 'empty', className: 'dws-card dws-empty' }, t('overview.empty'))
+          : chart,
         E('div', { key: 'tree', className: 'dws-card' }, [
           E('div', { key: 'head', className: 'dws-cardHead' }, [
             E('h3', { key: 'title', className: 'dws-cardTitle' }, t('overview.tree.title')),
-            E('span', { key: 'legend', className: 'dws-muted', style: { fontSize: '12px' } }, t('overview.turns')),
           ]),
           ...(root === undefined ? [E('div', { key: 'empty', className: 'dws-empty' }, t('overview.tree.empty'))] : renderWorkspace(root, 0)),
         ]),
-        settings.readme === true ? E('div', { key: 'readme', className: 'dws-card' }, [
+        // Only a README that actually read shows a card; otherwise the section is
+        // absent rather than an empty frame.
+        settings.readme === true && readme !== null ? E('div', { key: 'readme', className: 'dws-card' }, [
           E('div', { key: 'head', className: 'dws-cardHead' }, [
             E('h3', { key: 'title', className: 'dws-cardTitle' }, t('overview.readme')),
             root === undefined ? null : E('span', { key: 'path', className: 'dws-muted', style: { fontSize: '12px' } }, normalizePath(root.path) + '/README.md'),
@@ -593,11 +633,20 @@
         ]) : null,
       ])])
 
-      return E('div', { className: 'dws-page', 'data-panel': panelKey }, [
+      // A failure anywhere in the page degrades to a notice instead of the blank
+      // white pane that a swallowed throw used to leave behind (and which then
+      // persisted after switching to another workspace).
+      return E(QuietBoundary, {
+        fallback: () => E('div', { className: 'dws-page', 'data-panel': panelKey }, [
+          header,
+          E('div', { className: 'dws-pageBody' }, E('div', { className: 'dws-pageInner' },
+            E('div', { className: 'dws-card dws-empty' }, t('overview.failed')))),
+        ]),
+      }, E('div', { className: 'dws-page', 'data-panel': panelKey }, [
         header,
         body,
         dialogs.element,
-      ])
+      ]))
     }
 
     /** The sidebar panel-list icon for the overview page. */

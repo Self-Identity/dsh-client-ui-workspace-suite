@@ -83,7 +83,7 @@
       // call in every render, so it lives here with the other hooks — placing it
       // after the `open !== true` early return made the hook count differ between
       // the closed and open renders, which crashed the sidebar into a blank pane.
-      const ROW_DOUBLE_CLICK_MS = 250
+      const ROW_DOUBLE_CLICK_MS = RENAME_DOUBLE_CLICK_MS
       const lastClickRef = React.useRef({ key: null, at: 0 })
       const clickHandler = (key, onSingle, onDouble) => (event) => {
         const now = Date.now()

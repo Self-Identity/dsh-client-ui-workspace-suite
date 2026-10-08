@@ -53,11 +53,36 @@
         warn('slots/locale service missing; plugin idle')
         return
       }
-      const sessions = serviceOf(ctx, 'sessions')
-      const workspaces = serviceOf(ctx, 'workspaces')
-      const uiWorkspace = serviceOf(ctx, 'uiWorkspace')
-      const layout = serviceOf(ctx, 'layout')
-      const remote = serviceOf(ctx, 'remote')
+      // `let`, not `const`: a cold boot can run this before the workspace/layout
+      // services exist, and a reference captured once would then stay undefined for
+      // the whole session — the list still rendered, but "open session" and "open
+      // overview" silently did nothing until the plugin was reloaded by hand.
+      let sessions = serviceOf(ctx, 'sessions')
+      let workspaces = serviceOf(ctx, 'workspaces')
+      let uiWorkspace = serviceOf(ctx, 'uiWorkspace')
+      let layout = serviceOf(ctx, 'layout')
+      let remote = serviceOf(ctx, 'remote')
+
+      /**
+       * Re-resolve anything that was still missing when apply ran. Every method in
+       * the service face closes over these bindings, so one refresh heals all of
+       * them, and the boot record keeps the evidence.
+       */
+      const refreshServices = () => {
+        if (sessions === undefined) sessions = serviceOf(ctx, 'sessions')
+        if (workspaces === undefined) workspaces = serviceOf(ctx, 'workspaces')
+        if (uiWorkspace === undefined) uiWorkspace = serviceOf(ctx, 'uiWorkspace')
+        if (layout === undefined) layout = serviceOf(ctx, 'layout')
+        if (remote === undefined) remote = serviceOf(ctx, 'remote')
+        return { sessions, workspaces, uiWorkspace, layout, remote }
+      }
+      reportBoot('services-at-apply', {
+        sessions: sessions !== undefined,
+        workspaces: workspaces !== undefined,
+        uiWorkspace: uiWorkspace !== undefined,
+        layout: layout !== undefined,
+        remote: remote !== undefined,
+      })
       reportBoot('apply-enter', {
         slots: slots !== undefined,
         locale: locale !== undefined,
@@ -122,7 +147,9 @@
         slots,
         bindLocale: (namespace) => (namespace === undefined || namespace === null ? t : locale.bind(namespace)),
         openSession: (sessionId) => {
+          refreshServices()
           if (uiWorkspace !== undefined && typeof uiWorkspace.openSession === 'function') uiWorkspace.openSession(sessionId)
+          else reportBoot('openSession-unavailable', { sessionId })
         },
         openWorkspace: (workspaceId) => boundCall(uiWorkspace, 'openWorkspace', workspaceId),
         startSession: (workspaceId) => boundCall(uiWorkspace, 'startSession', workspaceId),
@@ -178,7 +205,9 @@
         },
         openOverview: (workspaceId) => {
           requestOverview(workspaceId)
+          refreshServices()
           if (layout !== undefined && typeof layout.selectPanel === 'function') layout.selectPanel(PANEL_ID)
+          else reportBoot('openOverview-unavailable', { workspaceId })
         },
       }
 
@@ -277,12 +306,26 @@
        * workspace list, not a second standalone place beside it.
        */
       const registerOverview = () => {
+        // Its own boundary: an error thrown while the page (or a child) renders must
+        // show a notice, never the blank pane the registration-level boundary leaves.
+        // The message also goes into the on-disk boot record, so a later failure can
+        // be read back instead of guessed at.
+        const guarded = (props) => E(QuietBoundary, {
+          fallback: () => E('div', { className: 'dws-page', 'data-panel': PANEL_ID },
+            E('div', { className: 'dws-pageBody' },
+              E('div', { className: 'dws-pageInner' },
+                E('div', { className: 'dws-card dws-empty' },
+                  (typeof props.t === 'function' ? props.t : (key) => key)('overview.failed'))))),
+          onError: (error) => reportBoot('overview-failed', String(error === null || error === undefined
+            ? 'unknown'
+            : (error.message === undefined ? error : error.message))),
+        }, E(SuiteOverview, props))
         registerIn('main', {
           name: 'main',
           key: PANEL_ID,
           locale: NS,
           inject: () => ({ services, panelKey: PANEL_ID }),
-        }, SuiteOverview)
+        }, guarded)
       }
 
       /**
