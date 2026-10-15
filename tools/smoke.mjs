@@ -411,8 +411,8 @@ if (plugin === undefined) {
   if (record === null) fail('the plugin wrote no boot record')
   else if (record.stage !== 'apply-ok') fail('the boot record stopped at stage ' + String(record.stage))
   else {
-    if (record.detail === null || record.detail.registered !== 6) {
-      fail('the boot record reports ' + JSON.stringify(record.detail) + ' instead of 6 accepted seats')
+    if (record.detail === null || record.detail.registered !== 7) {
+      fail('the boot record reports ' + JSON.stringify(record.detail) + ' instead of 7 accepted seats')
     }
     if (record.detail.rejected !== 0) fail('the boot record reports rejected seats: ' + String(record.detail.rejected))
     if (!Array.isArray(record.detail.keys) || !record.detail.keys.includes('sidebar.workspaces')) {
@@ -603,6 +603,28 @@ for (const { options, component } of registrations) {
   if (options.name === 'sidebar.panellist') {
     fail('the overview registered a standalone panel-list entry; it belongs in the workspace "More" menu')
   }
+  if (options.name === 'conversation.hero.workspace') {
+    // The shadowed hero menu lists root-level workspaces only: a child whose name
+    // only makes sense next to its parent must not appear on its own.
+    const heroRows = budget.elements.filter((entry) => entry.props !== null && typeof entry.props === 'object'
+      && typeof entry.props['data-menu-item'] === 'string')
+    const labels = heroRows.map((entry) => entry.props['data-menu-item'])
+    if (!labels.includes('alpha') || !labels.includes('other')) {
+      fail('the hero workspace menu did not list the root workspaces: ' + JSON.stringify(labels))
+    } else if (labels.includes('子项目备注')) {
+      fail('the hero workspace menu listed a child workspace as a root: ' + JSON.stringify(labels))
+    } else {
+      // The add entry must exist and come first: it is the menu's primary action.
+      const addRow = budget.elements.find((entry) => entry.props !== null && typeof entry.props === 'object'
+        && typeof entry.props.className === 'string' && entry.props.className.includes('dws-heroAdd'))
+      if (addRow === undefined) fail('the hero workspace menu has no add-workspace entry')
+      else if (heroRows.length > 0 && budget.elements.indexOf(addRow) > budget.elements.indexOf(heroRows[0])) {
+        fail('the add-workspace entry is not first in the hero workspace menu')
+      } else {
+        console.log('  hero menu: add entry first, ' + String(labels.length) + ' root item(s), no child entries')
+      }
+    }
+  }
   if (options.name === 'sidebar.workspaces') {
     const marks = budget.strings.filter((text) => text.startsWith('mark:'))
     if (marks.length === 0) fail('the row-leading ledger seat (schedule mark) was not rendered; ledger queries: ' + JSON.stringify(ledgerQueries))
@@ -706,22 +728,47 @@ if (railRegistration === undefined) {
   }
 }
 
-/* ------------------------- picker alignment seeds ------------------------- */
+/* --------------------------- picker open flow ----------------------------- */
 
-// The dialog opens "aligned with the current workspace state": the open flow
-// must probe the system root and then read every registered workspace path.
+// The dialog always probes the system root. Seeding the current workspace state is
+// opt-in (`initialPaths`) and belongs to the row menu's "workspace selection"
+// entry: the add-workspace holes must open blank, so they must NOT read the
+// registered workspace paths just to pre-check them.
 await new Promise((resolve) => setTimeout(resolve, 60))
 const requested = new Set(directoryReads)
 if (directoryReads.length === 0) {
   fail('the picker never read a directory; its open flow did not run')
 } else {
-  for (const path of ['C:/projects/alpha', 'C:/projects/alpha/sub', 'D:/other']) {
-    if (!requested.has(path)) fail('the picker did not align with the registered path: ' + path)
-  }
   const probed = directoryReads.some((path) => typeof path === 'string' && /^[A-Z]:\/$/.test(path))
   if (!probed) fail('the picker never probed a drive root')
-  console.log('directory reads: ' + String(directoryReads.length) + ' (drives probed: ' + String(probed)
-    + ', registered paths seeded: ' + String(['C:/projects/alpha', 'C:/projects/alpha/sub', 'D:/other'].filter((p) => requested.has(p)).length) + ')')
+  console.log('directory reads: ' + String(directoryReads.length) + ' (drives probed: ' + String(probed) + ')')
+}
+
+// An aligned render: handing the picker an explicit seed is what the row-menu entry
+// does, and it must still read those paths so the tree opens on them.
+{
+  const seat = originalRegistrations.find((entry) => entry.options.name === 'sidebar.workspaces.directoryFlow')
+  if (seat === undefined) fail('the sidebar directory-flow seat is missing')
+  else {
+    const before = directoryReads.length
+    const budget = { depth: 0, nodes: 0, strings: [], elements: [] }
+    HOOK_GUARD.allowEffects = true
+    try {
+      render(seat.component({
+        ...seatProps(seat.options),
+        initialPaths: ['C:/projects/alpha', 'D:/other'],
+      }), budget)
+    } catch (error) {
+      fail('the seeded picker threw: ' + String(error && error.message ? error.message : error))
+    }
+    // The open flow probes the drives first and seeds after those reads settle.
+    await new Promise((resolve) => setTimeout(resolve, 80))
+    const seeded = new Set(directoryReads.slice(before))
+    for (const path of ['C:/projects/alpha', 'D:/other']) {
+      if (!seeded.has(path)) fail('a seeded picker did not read its seed path: ' + path)
+    }
+    console.log('seeded picker: read ' + String(seeded.size) + ' path(s) for its ' + '2 seed(s)')
+  }
 }
 
 /* ----------------------------- module switches ---------------------------- */
@@ -809,6 +856,58 @@ if (face === undefined) {
     fail('service face call threw: ' + String(error && error.message ? error.message : error))
   }
   console.log('service face: ' + String(expected.length) + ' methods exercised')
+}
+
+/* --------------------------- cold-boot services ---------------------------- */
+
+// A cold boot can run apply before the workspace/layout services exist. The face
+// must heal itself on first use: a face that captured `undefined` once used to make
+// the picker open with "directory listing unavailable" until the plugin was reloaded.
+{
+  const lateBag = Object.assign({}, services)
+  let workspaceReady = false
+  lateBag.uiWorkspace = undefined
+  const lateCtx = {
+    get: (name) => {
+      if (name === 'uiWorkspace') return workspaceReady ? services.uiWorkspace : undefined
+      if (name === 'layout') return workspaceReady ? services.layout : undefined
+      return lateBag[name]
+    },
+    effect: (fn) => {
+      const dispose = fn()
+      return typeof dispose === 'function' ? dispose : () => {}
+    },
+    inject: (deps, callback) => {
+      const scope = {}
+      for (const dep of deps) scope[dep] = lateBag[dep]
+      callback(scope)
+    },
+    on: () => {},
+  }
+  try {
+    plugin.apply(lateCtx)
+  } catch (error) {
+    fail('apply threw with late services: ' + String(error && error.message ? error.message : error))
+  }
+  // Grab the face from the sidebar registration this apply produced, then let the
+  // service appear and call a method that needs it.
+  const lateRegistration = [...registrations].reverse()
+    .find((entry) => entry.options.name === 'sidebar.workspaces')
+  const lateServices = lateRegistration !== undefined && typeof lateRegistration.options.inject === 'function'
+    ? lateRegistration.options.inject().services
+    : undefined
+  if (lateServices === undefined) fail('the late-services apply registered nothing to test')
+  else {
+    workspaceReady = true
+    try {
+      const listing = await lateServices.listDirectory('C:/projects/alpha')
+      if (listing === undefined || listing === null) fail('listDirectory resolved with nothing after the service appeared')
+      else console.log('cold boot: the face healed itself (' + 'listDirectory resolved)')
+    } catch (error) {
+      fail('the face did not heal after the service appeared: '
+        + String(error && error.message ? error.message : error))
+    }
+  }
 }
 
 const pickerRegistration = registrations.find((entry) => entry.options.name === 'sidebar.workspaces.directoryFlow')
@@ -1039,9 +1138,11 @@ if (problems.length === 0) {
     }
     const badSide = placements.filter((props) => props.side !== 'bottom' && props.side !== 'top')
     if (badSide.length > 0) fail('a host menu received an unsupported side: ' + JSON.stringify(badSide[0].side))
-    const domAnchor = placements.filter((props) => props.anchor === null || typeof props.anchor !== 'object'
-      || props.anchor.$$element !== true)
-    if (domAnchor.length > 0) fail('a host menu received something other than a React element as its anchor')
+    // `anchor: null` is legitimate when a rect is supplied (the shipped hero picker
+    // positions that way); anything else non-element is not.
+    const domAnchor = placements.filter((props) => props.anchor !== null
+      && (typeof props.anchor !== 'object' || props.anchor.$$element !== true))
+    if (domAnchor.length > 0) fail('a host menu received something other than a React element or null as its anchor')
   }
 }
 

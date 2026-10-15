@@ -114,6 +114,24 @@
       return b.startsWith(a.endsWith('/') ? a : a + '/')
     }
 
+    /**
+     * Directory ancestors of one path, nearest first, normalized like every other
+     * path in this plugin: `C:\a\b` -> [`C:/a`, `C:`]. Used to keep a folder
+     * selection nestable (fill the chain, force a sibling's parent).
+     */
+    function parentPathsOf(value) {
+      const out = []
+      let current = normalizePath(value)
+      for (let guard = 0; guard < 64; guard += 1) {
+        const cut = current.replace(/[^/]+$/, '')
+        const parent = cut.replace(/\/+$/, '')
+        if (parent === '' || parent === current) break
+        out.push(parent)
+        current = parent
+      }
+      return out
+    }
+
     /** Trailing segment of a path, or the whole value when it has no separator. */
     function baseName(value) {
       const out = normalizePath(value)

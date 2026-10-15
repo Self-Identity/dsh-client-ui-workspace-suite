@@ -74,6 +74,13 @@
         if (uiWorkspace === undefined) uiWorkspace = serviceOf(ctx, 'uiWorkspace')
         if (layout === undefined) layout = serviceOf(ctx, 'layout')
         if (remote === undefined) remote = serviceOf(ctx, 'remote')
+        if (workspaceFiles === undefined) {
+          try {
+            workspaceFiles = remote === undefined || remote === null ? undefined : remote.workspaceFiles
+          } catch {
+            workspaceFiles = undefined
+          }
+        }
         return { sessions, workspaces, uiWorkspace, layout, remote }
       }
       reportBoot('services-at-apply', {
@@ -172,6 +179,12 @@
           return Promise.resolve(uiWorkspace.listDirectory(path, signal))
         },
         createDirectory: (path, name) => boundCall(uiWorkspace, 'createDirectory', path, name),
+        // The OS folder dialog, when the mounted picker backend offers one: the
+        // browse backend (which this bundle pins for in-app listing) has listing but
+        // no pick, so callers feature-detect and hide the entry when it rejects.
+        pickDirectory: (uiWorkspace !== undefined && typeof uiWorkspace.pickDirectory === 'function'
+          ? () => Promise.resolve(uiWorkspace.pickDirectory())
+          : undefined),
         readWorkspaceItems: () => (workspaces !== undefined && workspaces.list !== undefined
           && typeof workspaces.list.getSnapshot === 'function'
           ? (workspaces.list.getSnapshot().items || [])
@@ -209,6 +222,30 @@
           if (layout !== undefined && typeof layout.selectPanel === 'function') layout.selectPanel(PANEL_ID)
           else reportBoot('openOverview-unavailable', { workspaceId })
         },
+      }
+
+      /**
+       * A cold boot can run apply before the workspace/layout services exist, and the
+       * face captured the missing ones as `undefined` forever — which is what made the
+       * picker open with "directory listing unavailable" until the plugin was reloaded.
+       * Expose the mutable entries as live getters and give every method a refresh
+       * prologue, so the first call heals the whole face.
+       */
+      for (const name of ['sessions', 'workspaces']) {
+        Object.defineProperty(services, name, {
+          enumerable: true,
+          configurable: true,
+          get: () => refreshServices()[name],
+        })
+      }
+      Object.defineProperty(services, 'slots', { enumerable: true, configurable: true, get: () => slots })
+      for (const key of Object.keys(services)) {
+        const original = services[key]
+        if (typeof original !== 'function') continue
+        services[key] = (...args) => {
+          refreshServices()
+          return original(...args)
+        }
       }
 
       /**
@@ -264,30 +301,55 @@
 
       /** Register the picker into both directory-flow holes, shadowing the shipped dialog. */
       const registerPicker = () => {
+        const face = () => ({
+          t,
+          mode: 'add',
+          listDirectory: services.listDirectory,
+          createDirectory: services.createDirectory,
+          createWorkspace: services.createWorkspace,
+          renameWorkspace: services.renameWorkspace,
+          readWorkspaceItems: services.readWorkspaceItems,
+          startSession: services.startSession,
+        })
         registerIn('conversation.hero.workspace.directoryFlow', {
           name: 'conversation.hero.workspace.directoryFlow',
           priority: -1,
           locale: NS,
-          inject: () => ({
-            t,
-            listDirectory: services.listDirectory,
-            createWorkspace: services.createWorkspace,
-            renameWorkspace: services.renameWorkspace,
-            readWorkspaceItems: services.readWorkspaceItems,
-          }),
+          inject: face,
         }, DirectoryExplorer)
         registerIn('sidebar.workspaces.directoryFlow', {
           name: 'sidebar.workspaces.directoryFlow',
           priority: -1,
           locale: NS,
+          inject: face,
+        }, DirectoryExplorer)
+      }
+
+      /**
+       * The conversation window's workspace menu, shadowed so its history lists
+       * root-level workspaces only and a workspace with children asks which one the
+       * conversation starts in. It declares no children of its own: a shadowing entry
+       * may not redeclare the shadowed entry's holes, and the shipped declaration of
+       * `conversation.hero.workspace.directoryFlow` stays in force.
+       */
+      const registerHeroPicker = () => {
+        registerIn('conversation.hero.workspace', {
+          name: 'conversation.hero.workspace',
+          priority: -1,
+          locale: NS,
+          // The menu's add entry must work even when a shadowing occupant is handed no
+          // `renderSlot`, so the picker's own services travel with the registration.
           inject: () => ({
             t,
+            mode: 'add',
             listDirectory: services.listDirectory,
+            createDirectory: services.createDirectory,
             createWorkspace: services.createWorkspace,
             renameWorkspace: services.renameWorkspace,
             readWorkspaceItems: services.readWorkspaceItems,
+            startSession: services.startSession,
           }),
-        }, DirectoryExplorer)
+        }, HeroWorkspacePicker)
       }
 
       /** Take over the sidebar workspace list below every shipped entry's priority. */
@@ -372,6 +434,9 @@
         if (settings.modulePicker === true) registerPicker()
         if (settings.moduleTree === true) registerBrowser()
         if (settings.moduleOverview === true) registerOverview()
+        // Tied to the picker module: the hero menu only makes sense together with the
+        // add-workspace flow it opens.
+        if (settings.modulePicker === true) registerHeroPicker()
         registerSettings()
         lastSignature = signature
       }

@@ -75,6 +75,15 @@
       const [dialog, setDialog] = React.useState(null)
       const [notice, setNotice] = React.useState(null)
       const [pickerOpen, setPickerOpen] = React.useState(false)
+      // Which entry opened the inline picker: "add" starts blank and ends with the
+      // "which workspace do you enter?" chooser, exactly like the conversation
+      // window's add flow; "select" mirrors the current workspaces and just closes.
+      // One dialog instance serves both, so the intent has to travel with the open.
+      const [pickerMode, setPickerMode] = React.useState('add')
+      const openPicker = (mode) => {
+        setPickerMode(mode)
+        setPickerOpen(true)
+      }
       const noticeTimer = React.useRef(null)
 
       const workspaceState = useWorkspaces === null ? null : useWorkspaces((state) => state)
@@ -502,7 +511,7 @@
               ],
               onSelect: (id) => {
                 if (id === 'new') runAction(boundCall(services, 'startSession', workspace.workspaceId))
-                else if (id === 'pick') setPickerOpen(true)
+                else if (id === 'pick') openPicker('select')
                 else if (id === 'overview') services.openOverview(workspace.workspaceId)
                 else if (id === 'rename') setDialog({ kind: 'rename-workspace', id: workspace.workspaceId, draft: customTitle.length > 0 ? customTitle : baseName(workspace.path) })
                 else if (id === 'delete') setDialog({ kind: 'delete-workspace', id: workspace.workspaceId, name: workspaceTitle(workspace, t('browser.folder')) })
@@ -646,7 +655,7 @@
             label: t('browser.add'),
             iconName: 'IconProjectAddOutlineRegular',
             size: 16,
-            onClick: () => setPickerOpen(true),
+            onClick: () => openPicker('add'),
           }),
         ]
         : [
@@ -669,7 +678,7 @@
             pressed: anyCollapsed,
             onClick: () => setAllExpanded(anyCollapsed),
           }),
-          E(IconButton, { key: 'add', label: t('browser.add'), iconName: 'IconProjectAddOutlineRegular', size: 18, onClick: () => setPickerOpen(true) }),
+          E(IconButton, { key: 'add', label: t('browser.add'), iconName: 'IconProjectAddOutlineRegular', size: 18, onClick: () => openPicker('add') }),
         ])
 
       const body = (() => {
@@ -760,6 +769,38 @@
         style: { flex: '1 1 auto', minHeight: 0, ...maxHeight },
       }, body)
 
+      /**
+       * Delete one workspace together with everything under it. The removal runs in
+       * passes, deepest first, re-reading the live list each pass: the earlier
+       * single-chain version left the next level behind, so the parent had to be
+       * deleted again and again. Whatever refuses to go is reported.
+       */
+      const deleteSubtree = async (rootId, rootPath) => {
+        const deleteOne = (id) => Promise.resolve(services.deleteWorkspace(id))
+        const descendants = () => services.readWorkspaceItems()
+          .filter((item) => item !== null && typeof item === 'object'
+            && item.workspaceId !== rootId && typeof item.path === 'string' && isAncestorPath(rootPath, item.path))
+          .sort((left, right) => foldPath(right.path).length - foldPath(left.path).length)
+        for (let pass = 0; pass < 8; pass += 1) {
+          const doomed = descendants()
+          if (doomed.length === 0) break
+          for (const item of doomed) {
+            try {
+              await deleteOne(item.workspaceId)
+            } catch (reason) {
+              warn('cascade delete failed', reason)
+            }
+          }
+        }
+        try {
+          await deleteOne(rootId)
+        } catch (reason) {
+          warn('workspace delete failed', reason)
+        }
+        const left = descendants().length
+        if (left > 0) showNotice(t('browser.deleteResidue', { n: left }))
+      }
+
       const dialogs = []
       if (dialog !== null && (dialog.kind === 'rename-workspace' || dialog.kind === 'rename-session')) {
         const isWorkspace = dialog.kind === 'rename-workspace'
@@ -826,6 +867,15 @@
         ]))
       }
       if (dialog !== null && dialog.kind === 'delete-workspace') {
+        // Deleting a workspace takes its whole subtree with it: a child whose parent
+        // is gone would otherwise linger as an orphan. The dialog lists what goes, so
+        // the count is never a surprise, and the deepest entries are removed first.
+        const target = items.find((item) => item.workspaceId === dialog.id)
+        const doomed = target === undefined ? [] : items
+          .filter((item) => item.workspaceId !== dialog.id && isAncestorPath(target.path, item.path))
+          .sort((left, right) => foldPath(right.path).length - foldPath(left.path).length)
+        const names = doomed.map((item) => workspaceTitle(item, t('browser.folder')))
+        const preview = names.slice(0, 6).join('\u3001')
         dialogs.push(E(SuiteModal, {
           key: 'delete',
           open: true,
@@ -839,11 +889,17 @@
               variant: 'primary',
               onClick: () => {
                 setDialog(null)
-                runAction(services.deleteWorkspace(dialog.id))
+                // Children first (by passes), then the target itself.
+                if (target === undefined) runAction(services.deleteWorkspace(dialog.id))
+                else void deleteSubtree(dialog.id, target.path)
               },
             }, t('common.confirm')),
           ]),
-        }, E('div', { style: { fontSize: '13px', lineHeight: '20px' } }, t('browser.deleteBody', { name: dialog.name }))))
+        }, E('div', { style: { fontSize: '13px', lineHeight: '20px' } }, [
+          E('div', { key: 'body' }, t('browser.deleteBody', { name: dialog.name })),
+          doomed.length === 0 ? null : E('div', { key: 'cascade', className: 'dws-warn', style: { marginTop: '8px' } },
+            t('browser.deleteCascade', { n: doomed.length, names: preview + (names.length > 6 ? '\u2026' : '') })),
+        ])))
       }
 
       return E('div', { className: 'dws-root' + (wide ? '' : ' dws-root--rail') }, [
@@ -861,11 +917,25 @@
           open: pickerOpen,
           t,
           settings,
+          mode: pickerMode,
           listDirectory: services.listDirectory,
+          createDirectory: services.createDirectory,
           createWorkspace: services.createWorkspace,
           renameWorkspace: services.renameWorkspace,
           readWorkspaceItems: services.readWorkspaceItems,
+          startSession: services.startSession,
           workspacesHook: useWorkspaces,
+          // Only the "workspace selection" entry mirrors the workspaces that exist
+          // right now; the add entries open blank and finish with the chooser, which
+          // is what the conversation window's add flow does too.
+          ...(pickerMode === 'select'
+            ? {
+              initialPaths: () => items
+                .filter((item) => item !== null && typeof item === 'object' && typeof item.path === 'string')
+                .map((item) => item.path),
+            }
+            : {}),
+          ...(typeof services.pickDirectory === 'function' ? { pick: services.pickDirectory } : {}),
           ownCreate: (path) => services.createWorkspace({ path }),
           onPicked: () => {},
           onCancel: () => setPickerOpen(false),

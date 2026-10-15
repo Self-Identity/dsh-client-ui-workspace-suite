@@ -62,8 +62,12 @@
     function DirectoryExplorer(props) {
       const {
         open, busy, t, onPicked, onCancel, onError, ownCreate,
-        listDirectory, createWorkspace, renameWorkspace,
+        listDirectory, createWorkspace, renameWorkspace, createDirectory, startSession, mode,
       } = props
+      // "add" flows (the two add-workspace holes) finish by asking which folder to
+      // enter; the row menu's "workspace selection" entry is a structure edit and
+      // just closes. `mode` is explicit; the inline picker also passes ownCreate.
+      const isAddFlow = mode !== 'select' && ownCreate === undefined
       // The settings snapshot may be supplied by the caller (the workspace
       // browser already holds one); otherwise this dialog reads the store.
       const liveSettings = useSettings()
@@ -76,9 +80,22 @@
       const [pathDraft, setPathDraft] = React.useState(null)
       const [error, setError] = React.useState(null)
       const [creating, setCreating] = React.useState(false)
+      // A pick that belongs to another tree than the current selection: held here
+      // until the user replaces the selection or cancels (hook, so it stays above
+      // the `open !== true` early return).
+      const [conflict, setConflict] = React.useState(null)
+      // Inline "create a child folder" editor: { parent, name, error } or null.
+      const [newFolder, setNewFolder] = React.useState(null)
+      // After an add-workspace submit, the "which folder do we enter?" chooser.
+      const [entryOpen, setEntryOpen] = React.useState(false)
+      const [entryChoice, setEntryChoice] = React.useState(null)
       const cache = React.useMemo(() => createListingCache(listDirectory), [listDirectory])
       const generation = React.useRef(0)
       const treeRef = React.useRef(null)
+      // Mirrors the selection for callbacks that run outside the render they were
+      // created in (a path accepted asynchronously must not toggle a stale map).
+      const selectedRef = React.useRef(selected)
+      selectedRef.current = selected
       // Click bookkeeping for the shortened double-click window. This MUST be a hook
       // call in every render, so it lives here with the other hooks — placing it
       // after the `open !== true` early return made the hook count differ between
@@ -162,7 +179,10 @@
           ? props.initialPaths()
           : Array.isArray(props.initialPaths)
             ? props.initialPaths
-            : readItems().map((item) => (item === null || typeof item !== 'object' ? '' : item.path))
+            // No explicit seed: start blank. "Add workspace" must not pre-check the
+            // existing workspaces; only the row menu's "workspace selection" entry
+            // passes `initialPaths` to mirror the current state.
+            : []
         const paths = (Array.isArray(seeds) ? seeds : [])
           .filter((value) => typeof value === 'string' && value.length > 0)
           .slice(0, 40)
@@ -339,12 +359,44 @@
       const rootKey = '::root::'
       const isSelected = (path) => selected.has(foldPath(path))
 
+      /**
+       * Add one folder plus whatever intermediate ancestors keep the set nestable:
+       *  - the whole chain between the new folder and the nearest **already selected**
+       *    ancestor, so a deep pick never lands as an orphan next to its own parent;
+       *  - the common parent when the new folder is a **sibling** of an existing pick
+       *    (the rule the user asked for), even when nothing above is selected yet.
+       * A first pick with nothing around it adds only itself.
+       */
+      const addSelection = (path, remark) => {
+        setSelected((previous) => {
+          const next = new Map(previous)
+          const parents = parentPathsOf(path)
+          const parentKey = parents.length === 0 ? '' : foldPath(parents[0])
+          const hasSibling = [...previous.values()].some((entry) => foldPath(entry.path) !== foldPath(path)
+            && parentKey !== '' && parentPathsOf(entry.path).length > 0
+            && foldPath(parentPathsOf(entry.path)[0]) === parentKey)
+          const selectedAncestorIndex = parents.findIndex((parent) => next.has(foldPath(parent)))
+          const stopIndex = selectedAncestorIndex === -1 ? -1 : selectedAncestorIndex - 1
+          const fillTop = Math.max(stopIndex, hasSibling ? 0 : -1)
+          for (let index = 0; index <= fillTop; index += 1) {
+            const parent = parents[index]
+            const parentPathKey = foldPath(parent)
+            if (!next.has(parentPathKey)) next.set(parentPathKey, { path: parent, remark: remarkFor(parent) })
+          }
+          const key = foldPath(path)
+          if (!next.has(key)) next.set(key, { path, remark: remark === undefined ? remarkFor(path) : remark })
+          return next
+        })
+      }
+
       const toggleSelect = (path, remark) => {
         const key = foldPath(path)
-        if (selected.has(key)) {
+        // Read the latest committed selection, not the map this render closed over:
+        // the typed-path and system-dialog entries call this from a promise callback.
+        const current = selectedRef.current
+        if (current.has(key)) {
           // Unchecking a parent unchecks everything selected beneath it in the same
-          // click, so a selection can never keep an orphaned child without its
-          // parent (the tree structure the preview draws would be broken).
+          // click, so a selection can never keep an orphaned child without its parent.
           setSelected((previous) => {
             const next = new Map()
             for (const [entryKey, value] of previous) {
@@ -355,11 +407,17 @@
           })
           return
         }
-        setSelected((previous) => {
-          const next = new Map(previous)
-          next.set(key, { path, remark: remark === undefined ? remarkFor(path) : remark })
-          return next
-        })
+        // A pick that is neither an ancestor nor a descendant of *any* current pick
+        // starts a different tree, so ask before replacing the existing selection.
+        const related = [...current.values()].some((entry) => isAncestorPath(entry.path, path)
+          || isAncestorPath(path, entry.path))
+        if (current.size > 0 && !related) {
+          setConflict({ path, remark })
+          return
+        }
+        addSelection(path, remark)
+        // Checking a folder opens it, so its children are immediately pickable.
+        setOpen(path, true)
       }
 
       /** Remark already stored for a registered workspace with this path. */
@@ -448,16 +506,62 @@
             E('span', { key: 'icon', className: 'dws-folderIcon' },
               icon(isOpen ? 'IconFolderOpenRegular' : 'IconFolderCloseRegular', 16)),
             E('span', { key: 'name', className: 'dws-pickerName' }, entry.name),
+            E('button', {
+              key: 'add',
+              type: 'button',
+              // Revealed on hover only: the row stays quiet until the pointer is on it.
+              className: 'dws-addButton',
+              'aria-label': t('picker.newFolder'),
+              title: t('picker.newFolder'),
+              tabIndex: -1,
+              onClick: (event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                setOpen(entry.path, true)
+                setNewFolder({ parent: entry.path, name: '', error: null })
+              },
+            }, icon('IconProjectAddOutlineRegular', 14)),
           ]))
+          if (newFolder !== null && foldPath(newFolder.parent) === entryKey) {
+            rows.push(E('div', {
+              key: keyPrefix + ':' + entryKey + ':new',
+              className: 'dws-pickerRow dws-pickerRow--editor',
+              style: { '--suite-indent': String((depth + 1) * 14) + 'px' },
+            }, [
+              E('span', { key: 'icon', className: 'dws-folderIcon' }, icon('IconFolderCloseRegular', 16)),
+              E('input', {
+                key: 'input',
+                className: 'dws-input',
+                style: { flex: '1 1 auto', minWidth: 0 },
+                autoFocus: true,
+                value: newFolder.name,
+                placeholder: t('picker.newFolder.placeholder'),
+                'aria-label': t('picker.newFolder'),
+                onClick: (event) => event.stopPropagation(),
+                onChange: (event) => setNewFolder({ ...newFolder, name: event.target.value, error: null }),
+                onKeyDown: (event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault()
+                    commitNewFolder()
+                  } else if (event.key === 'Escape') {
+                    event.preventDefault()
+                    setNewFolder(null)
+                  }
+                },
+              }),
+              newFolder.error === null ? null : E('span', { key: 'error', className: 'dws-warn' }, newFolder.error),
+            ]))
+          }
           if (isOpen) rows.push(...renderLevel(entry.path, depth + 1, keyPrefix + ':' + entryKey))
         }
         if (record.listing.truncated) {
-          rows.push(E('div', { key: keyPrefix + ':trunc', className: 'dws-warn', style: { padding: '4px 8px' } }, t('picker.root')))
+          rows.push(E('div', { key: keyPrefix + ':trunc', className: 'dws-warn', style: { padding: '4px 8px' } }, t('picker.truncated')))
         }
         return rows
       }
 
-      const previewNodes = () => {
+      /** Selected folders ordered parents-first: creation must follow this order. */
+      const selectionOrder = () => {
         const list = [...selected.values()].slice().sort((left, right) => {
           const depth = foldPath(left.path).length - foldPath(right.path).length
           return depth !== 0 ? depth : left.path.localeCompare(right.path)
@@ -471,14 +575,42 @@
         })
       }
 
+      /**
+       * The breadcrumb shown for one folder: the chain of confirmed ancestors from
+       * the shallowest down to itself, joined with "/". A segment that is a
+       * registered workspace uses its workspace name (so a remark shows), anything
+       * else falls back to the folder name. This is what makes a child like "src"
+       * readable on its own in the chooser list.
+       */
+      const breadcrumbOf = (path) => {
+        const registered = readItems()
+        const nameFor = (value) => {
+          const item = registered.find((entry) => entry !== null && typeof entry === 'object'
+            && foldPath(entry.path) === foldPath(value))
+          return item === undefined ? baseName(value) : workspaceTitle(item, baseName(value))
+        }
+        const chain = selectionOrder()
+          .filter((entry) => isAncestorPath(entry.path, path))
+          .map((entry) => entry.path)
+        return (chain.length > 0 ? chain.concat([path]) : [path]).map(nameFor).join('/')
+      }
+
       const submit = () => {
-        const list = previewNodes()
+        const list = selectionOrder()
         if (list.length === 0) return
         const primary = list[0]
         setCreating(true)
         setError(null)
         const finish = () => {
           setCreating(false)
+          if (isAddFlow && typeof startSession === 'function') {
+            // The add flow asks which of the confirmed folders to enter rather than
+            // guessing on the user's behalf; the selection entry just closes.
+            const confirmed = selectionOrder()
+            setEntryChoice(confirmed.length > 0 ? confirmed[0].path : null)
+            setEntryOpen(true)
+            return
+          }
           onCancel()
         }
         const fail = (reason) => {
@@ -495,13 +627,20 @@
             .catch(fail)
           return
         }
-        // Hole mode: the flow owner adopts the primary path; the remaining
-        // selections are created here. Remarks are applied to both.
-        Promise.resolve(onPicked(primary.path))
-          .then(() => Promise.all([
-            applyRemarkEventually(primary, 8),
-            ...list.slice(1).map((entry) => ensureWorkspace((path) => createWorkspace({ path }), entry).catch(() => undefined)),
-          ]))
+        // Hole mode. The flow owner's `onPicked` adopts one path **and enters it
+        // immediately** (it also closes the flow), which used to swallow this dialog's
+        // post-submit chooser. So the dialog creates every confirmed path itself and
+        // leaves entering to the chooser; `onPicked` stays a fallback for builds that
+        // cannot create workspaces directly.
+        if (typeof createWorkspace !== 'function' && typeof onPicked === 'function') {
+          Promise.resolve(onPicked(primary.path))
+            .then(() => applyRemarkEventually(primary, 8))
+            .then(finish)
+            .catch(fail)
+          return
+        }
+        Promise.all(list.map((entry) => ensureWorkspace((path) => createWorkspace({ path }), entry)
+          .catch(() => undefined)))
           .then(finish)
           .catch(fail)
       }
@@ -543,42 +682,177 @@
           .then(() => applyRemarkEventually(entry, attempts - 1))
       }
 
-      const crumbs = (() => {
+      /**
+       * Accept an absolute path from the typed input or the system dialog: validate
+       * it, open it, then select that folder through `toggleSelect` so every
+       * selection constraint still applies. An unreadable path reports inline.
+       */
+      /**
+       * A picked value may arrive as the path itself or as `{ path }`, depending on
+       * the backend the seam is pinned to.
+       */
+      const pathOf = (value) => {
+        if (typeof value === 'string') return value
+        if (value !== null && typeof value === 'object' && typeof value.path === 'string') return value.path
+        return ''
+      }
+
+      /**
+       * Move the keyboard focus onto one rendered row and scroll it into view.
+       *
+       * The row only exists once its ancestors' listings have rendered, so this
+       * retries; and it compares **folded** paths instead of using an exact attribute
+       * selector, because the host listing may spell a path with different separators
+       * or casing than the one the user typed (which made the focus silently miss).
+       */
+      const focusPath = (path, attempts) => {
+        const remaining = attempts === undefined ? 24 : attempts
+        const container = treeRef.current
+        const wanted = foldPath(path)
+        let row = null
+        if (wanted.length > 0 && container !== null && typeof container.querySelectorAll === 'function') {
+          for (const node of container.querySelectorAll('[data-path]')) {
+            const candidate = node.getAttribute('data-path')
+            if (typeof candidate === 'string' && candidate.length > 0 && foldPath(candidate) === wanted) {
+              row = node
+              break
+            }
+          }
+        }
+        if (row !== null) {
+          if (typeof row.scrollIntoView === 'function') row.scrollIntoView({ block: 'nearest' })
+          if (typeof row.focus === 'function') row.focus()
+          return
+        }
+        if (remaining <= 0) return
+        setTimeout(() => focusPath(path, remaining - 1), 150)
+      }
+
+      const acceptPath = (value) => {
+        const target = normalizePath(pathOf(value).trim())
+        if (target.length === 0) return
+        setError(null)
+        Promise.resolve(cache.load(target))
+          .then((listing) => {
+            if (listing.status !== 'ready') {
+              setError(t('picker.pathInvalid', { message: toStringOr(listing.message, target) }))
+              return
+            }
+            // Open every level on the way down (shallowest first) so the leaf is on
+            // screen, then open the leaf itself — and stop there: typing a path must
+            // not pull in the level below it.
+            const chain = parentPathsOf(target)
+            for (let index = chain.length - 1; index >= 0; index -= 1) setOpen(chain[index], true)
+            ingest(target, listing)
+            setOpen(target, true)
+            if (!selectedRef.current.has(foldPath(target))) toggleSelect(target)
+            focusPath(target)
+          })
+          .catch((reason) => setError(errorMessage(reason)))
+      }
+
+      /**
+       * Create the child folder the inline editor is naming. A sibling with the same
+       * name (per the loaded listing) is refused in place, and the backend's own
+       * refusal surfaces the same way. A created folder is opened and adopted as a
+       * selection, then focused.
+       */
+      const commitNewFolder = () => {
+        const draft = newFolder
+        if (draft === null) return
+        const name = String(draft.name === undefined ? '' : draft.name).trim()
+        if (name.length === 0) return
+        const record = nodes.get(foldPath(draft.parent))
+        const siblings = record === undefined || record.status !== 'ready' || !Array.isArray(record.listing.entries)
+          ? []
+          : record.listing.entries
+        if (siblings.some((entry) => String(entry.name).toLowerCase() === name.toLowerCase())) {
+          setNewFolder({ ...draft, error: t('picker.newFolder.duplicate') })
+          return
+        }
+        if (typeof createDirectory !== 'function') {
+          setNewFolder({ ...draft, error: t('picker.newFolder.unavailable') })
+          return
+        }
+        Promise.resolve(createDirectory(draft.parent, name))
+          .then(() => {
+            const created = normalizePath(draft.parent + '/' + name)
+            setNewFolder(null)
+            // Forced reload: the cached level predates the new folder.
+            Promise.resolve(cache.load(draft.parent, true))
+              .then((listing) => {
+                if (listing.status === 'ready') ingest(draft.parent, listing)
+              })
+              .catch(() => undefined)
+            setOpen(created, true)
+            if (!selectedRef.current.has(foldPath(created))) toggleSelect(created)
+            focusPath(created)
+          })
+          .catch((reason) => setNewFolder({ ...draft, error: errorMessage(reason) }))
+      }
+
+      /** Enter the chooser's folder as a fresh session in its workspace. */
+      const startEntry = () => {
+        const chosen = entryChoice
+        if (chosen === null || chosen === undefined) return
+        const item = readItems().find((entry) => entry !== null && typeof entry === 'object'
+          && foldPath(entry.path) === foldPath(chosen))
+        setEntryOpen(false)
+        if (item === undefined || typeof startSession !== 'function') {
+          onCancel()
+          return
+        }
+        Promise.resolve(startSession(item.workspaceId))
+          .catch((reason) => {
+            if (typeof onError === 'function') onError(errorMessage(reason))
+          })
+          .then(() => onCancel())
+      }
+
+      /**
+       * The level the tree is currently rooted at: the deepest crumb the root level
+       * reported, its home fallback, or the first entry's own directory when that
+       * level is a bare drive list.
+       */
+      const rootPath = (() => {
         const rootRecord = nodes.get('::root::')
-        const primary = previewNodes()[0]
-        const record = primary === undefined ? undefined : nodes.get(foldPath(primary.path))
-        if (record !== undefined && record.status === 'ready' && record.listing.crumbs.length > 0) {
-          return record.listing.crumbs.slice(-4)
+        if (rootRecord === undefined || rootRecord.status !== 'ready') return ''
+        const listing = rootRecord.listing
+        const crumbs = Array.isArray(listing.crumbs) ? listing.crumbs : []
+        for (let index = crumbs.length - 1; index >= 0; index -= 1) {
+          const candidate = crumbs[index]
+          const path = candidate === null || typeof candidate !== 'object'
+            ? ''
+            : String(candidate.path === undefined ? '' : candidate.path)
+          if (path.length > 0) return normalizePath(path)
         }
-        if (rootRecord !== undefined && rootRecord.status === 'ready' && rootRecord.listing.crumbs.length > 0) {
-          return rootRecord.listing.crumbs.slice(-4)
-        }
-        if (rootRecord !== undefined && rootRecord.status === 'ready' && rootRecord.listing.home !== '') {
-          return [{ name: rootRecord.listing.home, path: rootRecord.listing.home }]
-        }
-        return []
+        if (typeof listing.home === 'string' && listing.home.length > 0) return normalizePath(listing.home)
+        const first = Array.isArray(listing.entries) && listing.entries.length > 0 ? listing.entries[0] : undefined
+        return first === undefined || typeof first.path !== 'string' ? '' : normalizePath(first.path)
+      })()
+
+      /**
+       * The path the toolbar shows: the **root node of the current selection**
+       * (the shallowest checked folder — picking plugins / dsh-host-mobile-gateway /
+       * deploy shows `F:\DSH-Official\plugins`), falling back to the level being
+       * browsed while nothing is checked. The full path rides in the tooltip.
+       */
+      const displayPath = (() => {
+        const checked = [...selected.values()]
+          .map((entry) => normalizePath(entry.path))
+          .filter((path) => path.length > 0)
+          .sort((left, right) => foldPath(left).length - foldPath(right).length)
+        if (checked.length > 0) return checked[0]
+        return rootPath
       })()
 
       const body = E('div', { className: 'dws-dialogBody' }, [
         E('div', { key: 'crumbs', className: 'dws-dialogToolbar' }, [
           pathDraft === null
             ? E('div', { key: 'trail', className: 'dws-crumbs', style: { flex: '1 1 auto' } }, [
-              ...(crumbs.length === 0 ? [E('span', { key: 'none', className: 'dws-muted' }, t('picker.root'))] : []),
-              ...crumbs.map((crumb, index) => E('span', { key: crumb.path, className: 'dws-crumbs' }, [
-                index > 0 ? E('span', { key: 'sep', className: 'dws-muted' }, '/') : null,
-                E('button', {
-                  key: 'crumb',
-                  type: 'button',
-                  className: 'dws-crumb',
-                  title: crumb.path,
-                  onClick: (event) => {
-                    event.preventDefault()
-                    toggle(crumb.path)
-                  },
-                }, toStringOr(crumb.name, crumb.path)),
-              ])),
-              E(TextButton, { key: 'edit', onClick: () => setPathDraft(crumbs.length > 0 ? crumbs[crumbs.length - 1].path : '') },
-                t('picker.root')),
+              E('span', { key: 'path', className: 'dws-pickerPath', title: displayPath },
+                displayPath.length === 0 ? t('picker.root') : displayPath),
+              E(TextButton, { key: 'edit', onClick: () => setPathDraft(displayPath) }, t('picker.pathEdit')),
             ])
             : E('div', { key: 'draft', className: 'dws-inlineEdit' }, [
               E('input', {
@@ -587,13 +861,18 @@
                 value: pathDraft,
                 'aria-label': t('picker.title'),
                 autoFocus: true,
+                // The field opens pre-filled with the shown path: select it all so a
+                // paste or retype replaces it instead of appending.
+                onFocus: (event) => {
+                  if (typeof event.target.select === 'function') event.target.select()
+                },
                 onChange: (event) => setPathDraft(event.target.value),
                 onKeyDown: (event) => {
                   if (event.key === 'Enter') {
                     event.preventDefault()
                     const target = pathDraft.trim()
-                    if (target.length > 0) preload(target, 0)
                     setPathDraft(null)
+                    if (target.length > 0) acceptPath(target)
                   } else if (event.key === 'Escape') {
                     setPathDraft(null)
                   }
@@ -601,8 +880,8 @@
               }),
               E(SuiteButton, { key: 'go', variant: 'primary', onClick: () => {
                 const target = pathDraft.trim()
-                if (target.length > 0) preload(target, 0)
                 setPathDraft(null)
+                if (target.length > 0) acceptPath(target)
               } }, t('picker.open')),
             ]),
           E('span', { key: 'filter', style: { flex: '0 1 180px', minWidth: '0', display: 'flex' } },
@@ -634,77 +913,14 @@
         }, [
           ...renderLevel(rootKey, 0, 'root'),
         ]),
-        E('div', { key: 'preview', className: 'dws-pickerScroll' }, [
-          E('div', { key: 'head', className: 'dws-previewHead' }, [
-            E('span', { key: 'title' }, t('picker.preview.title')),
-            E('span', { key: 'count' }, t('picker.selected', { n: selected.size })),
-          ]),
-          E('div', { key: 'body', className: 'dws-previewBody' }, selected.size === 0
-            ? [E('div', { key: 'empty', className: 'dws-muted' }, t('picker.preview.empty'))]
-            : [
-              E('div', { key: 'hint', className: 'dws-muted', style: { marginBottom: '2px' } }, t('picker.preview.rename')),
-              E('div', { key: 'line', className: 'dws-previewLine' }, previewNodes().map((entry) => E('div', {
-                key: foldPath(entry.path),
-                className: 'dws-previewNode',
-              }, [
-                E('span', { key: 'conn', className: 'dws-previewConnector' },
-                  '\u2502 '.repeat(Math.max(0, entry.depth - 1)) + (entry.depth > 0 ? '\u251C\u2500 ' : '')),
-                E('span', { key: 'icon', className: 'dws-folderIcon' }, icon('IconFolderCloseRegular', 14)),
-                E('span', {
-                  key: 'name',
-                  className: 'dws-previewName',
-                  title: entry.path,
-                  // Same shortened double-click window as the tree rows.
-                  onClick: clickHandler('preview:' + foldPath(entry.path), undefined, () => {
-                    setSelected((previous) => {
-                      const next = new Map(previous)
-                      const key = foldPath(entry.path)
-                      const current = next.get(key)
-                      next.set(key, { ...current, editing: true })
-                      return next
-                    })
-                  }),
-                }, entry.editing === true
-                  ? [E('input', {
-                    key: 'edit',
-                    className: 'dws-input',
-                    style: { width: '140px' },
-                    autoFocus: true,
-                    placeholder: t('picker.preview.remarkPlaceholder'),
-                    defaultValue: entry.remark === undefined ? '' : entry.remark,
-                    onClick: (inner) => inner.stopPropagation(),
-                    onKeyDown: (inner) => {
-                      if (inner.key === 'Enter') inner.currentTarget.blur()
-                      if (inner.key === 'Escape') {
-                        inner.currentTarget.value = entry.remark === undefined ? '' : entry.remark
-                        inner.currentTarget.blur()
-                      }
-                    },
-                    onBlur: (inner) => {
-                      const value = inner.currentTarget.value.trim()
-                      setSelected((previous) => {
-                        const next = new Map(previous)
-                        const key = foldPath(entry.path)
-                        const current = next.get(key)
-                        next.set(key, { ...current, remark: value.length === 0 ? undefined : value, editing: false })
-                        return next
-                      })
-                    },
-                  })]
-                  : [
-                    E('span', { key: 'label' }, toStringOr(entry.remark, baseName(entry.path))),
-                    entry.remark === undefined
-                      ? null
-                      : E('span', { key: 'original', className: 'dws-original' }, baseName(entry.path)),
-                  ]),
-              ]))),
-            ]),
-        ]),
       ])
 
-      const footer = E('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', width: '100%' } }, [
+      const footer = E('div', {
+        className: 'dws-pickerFooter',
+        style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', width: '100%' },
+      }, [
         E('span', { key: 'note', className: 'dws-footerNote' }, error === null
-          ? (previewNodes().some((entry) => registeredFor(entry.path) !== undefined)
+          ? (selectionOrder().some((entry) => registeredFor(entry.path) !== undefined)
             ? t('picker.alignedHint')
             : t('picker.remarkOnly'))
           : error),
@@ -719,13 +935,87 @@
         ]),
       ])
 
+      /**
+       * The post-submit chooser: only the structure the user just confirmed, fully
+       * expanded, one folder selectable. Entering runs a fresh session inside that
+       * workspace; skipping just closes (the workspaces are already registered).
+       */
+      const entryDialog = entryOpen !== true ? null : E(SuiteModal, {
+        key: 'entry',
+        open: true,
+        onClose: () => onCancel(),
+        title: t('picker.entry.title'),
+        closeLabel: t('common.close'),
+        footer: E(React.Fragment, null, [
+          E(SuiteButton, { key: 'skip', variant: 'outline', onClick: () => onCancel() }, t('picker.entry.skip')),
+          E(SuiteButton, {
+            key: 'enter',
+            variant: 'primary',
+            disabled: entryChoice === null,
+            onClick: startEntry,
+          }, t('picker.entry.enter')),
+        ]),
+      }, [
+        E('div', { key: 'note', className: 'dws-muted', style: { marginBottom: '6px' } }, t('picker.entry.body')),
+        E('div', { key: 'list', className: 'dws-pickerTree', style: { maxHeight: 'min(40vh,360px)' } },
+          selectionOrder().map((entry) => {
+            const chosen = entryChoice !== null && foldPath(entryChoice) === foldPath(entry.path)
+            return E('div', {
+              key: 'entry:' + entry.path,
+              className: 'dws-pickerRow' + (chosen ? ' dws-pickerRow--selected' : ''),
+              style: { '--suite-indent': String(entry.depth * 14) + 'px' },
+              role: 'radio',
+              'aria-checked': chosen ? 'true' : 'false',
+              tabIndex: 0,
+              title: entry.path,
+              onClick: () => setEntryChoice(entry.path),
+              onKeyDown: (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault()
+                  setEntryChoice(entry.path)
+                }
+              },
+            }, [
+              E('span', { key: 'icon', className: 'dws-folderIcon' }, icon('IconFolderOpenRegular', 16)),
+              E('span', { key: 'name', className: 'dws-pickerName' }, baseName(entry.path)),
+            ])
+          })),
+      ])
+
       return E(React.Fragment, null,
+        conflict === null ? null : E(SuiteModal, {
+          key: 'conflict',
+          open: true,
+          onClose: () => setConflict(null),
+          title: t('picker.conflict.title'),
+          closeLabel: t('common.close'),
+          footer: E(React.Fragment, null, [
+            E(SuiteButton, { key: 'cancel', variant: 'outline', onClick: () => setConflict(null) },
+              t('picker.conflict.cancel')),
+            E(SuiteButton, {
+              key: 'replace',
+              variant: 'primary',
+              onClick: () => {
+                const pending = conflict
+                setConflict(null)
+                if (pending !== null) {
+                  // Replace: drop everything, then add the new pick (with its chain).
+                  setSelected(new Map())
+                  addSelection(pending.path, pending.remark)
+                }
+              },
+            }, t('picker.conflict.replace')),
+          ]),
+        }, E('div', { style: { fontSize: '13px', lineHeight: '20px' } },
+          t('picker.conflict.body', { name: baseName(conflict.path) }))),
+        entryDialog,
         E(SuiteModal, {
           open: true,
           onClose: creating ? () => {} : onCancel,
           title: t('picker.title'),
           closeLabel: t('common.close'),
           className: 'dws-dialog dws-picker',
+          contentClassName: 'dws-pickerContent',
           footer,
         }, body))
     }

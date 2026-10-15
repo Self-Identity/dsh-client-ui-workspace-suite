@@ -26,7 +26,7 @@ const check = (label, actual, expected) => {
 }
 
 const names = [
-  'normalizePath', 'foldPath', 'isAncestorPath', 'baseName', 'workspaceTitle',
+  'normalizePath', 'foldPath', 'isAncestorPath', 'baseName', 'workspaceTitle', 'parentPathsOf',
   'buildWorkspaceTree', 'collectSubtree', 'ancestorsOf', 'chainForPath', 'formatTokens',
   'sumBuckets', 'dayKey', 'relativeTime', 'errorMessage', 'timestamp',
   'usageViewOf', 'boundCall', 'USAGE_KEY',
@@ -58,12 +58,20 @@ for (const name of names) {
 }
 
 const {
-  normalizePath, isAncestorPath, baseName, workspaceTitle, buildWorkspaceTree,
+  normalizePath, isAncestorPath, baseName, workspaceTitle, buildWorkspaceTree, parentPathsOf,
   collectSubtree, ancestorsOf, chainForPath, formatTokens, sumBuckets, dayKey, relativeTime,
   errorMessage, timestamp, usageViewOf, boundCall, USAGE_KEY,
 } = exported
 
 /* --------------------------------- paths ---------------------------------- */
+
+// Ancestor chains drive the picker's nestability rules: fill the gap to the nearest
+// selected ancestor, and force a sibling's parent.
+check('parentPathsOf deep', parentPathsOf('C:\\a\\b\\c').join('|'), 'C:/a/b|C:/a|C:')
+check('parentPathsOf drive root', parentPathsOf('C:\\').join('|'), '')
+check('parentPathsOf bare drive', parentPathsOf('C:').join('|'), '')
+check('parentPathsOf posix', parentPathsOf('/home/user/x').join('|'), '/home/user|/home')
+check('parentPathsOf normalizes', parentPathsOf('F:\\DSH-Official\\plugins').join('|'), 'F:/DSH-Official|F:')
 
 check('normalizePath windows separators', normalizePath('C:\\Users\\yan\\proj\\'), 'C:/Users/yan/proj')
 // A bare drive keeps the form the trail trim leaves; comparisons add the

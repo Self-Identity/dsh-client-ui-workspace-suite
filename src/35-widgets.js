@@ -237,7 +237,7 @@
      * `dws-dialog` frame is opt-in: a caller that just needs a compact native
      * dialog (rename, confirm) passes no className and gets the host sizing.
      */
-    function SuiteModal({ open, onClose, title, footer, className, children, closeLabel }) {
+    function SuiteModal({ open, onClose, title, footer, className, contentClassName, children, closeLabel }) {
       if (open !== true) return null
       if (hasPrimitive('Modal')) {
         return E(ui.Modal, {
@@ -247,6 +247,9 @@
           title,
           footer,
           ...(className === undefined || className === '' ? {} : { className }),
+          // The host wraps `children` in its own body element, so styling the content
+          // wrapper is the only way to let that column size and scroll correctly.
+          ...(contentClassName === undefined || contentClassName === '' ? {} : { contentClassName }),
         }, children)
       }
       return E(FallbackModal, { onClose, title, footer, className, closeLabel }, children)

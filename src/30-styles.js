@@ -127,6 +127,14 @@
       '.dws-title[data-scrolled]{mask-image:linear-gradient(90deg,#0000,#000 12px)}',
       '.dws-title[data-clipped]{mask-image:linear-gradient(270deg,#0000,#000 12px)}',
       '.dws-title[data-scrolled][data-clipped]{mask-image:linear-gradient(90deg,#0000,#000 12px calc(100% - 12px),#0000)}',
+      // While the title crawls, drop the ellipsis: it is painted at the clip edge and
+      // would replace the characters being scrolled into view. The right-hand fade
+      // mask takes over that job instead.
+      '.dws-title[data-scrolled]{text-overflow:clip}',
+      // A remark + original name pair sits in inner spans that ellipsize on their own,
+      // which hides the overflow the crawl is supposed to reveal: while the row is
+      // hovered they keep their natural width instead.
+      '.dws-wsRow:hover .dws-title .dws-ellipsis,.dws-wsRow:hover .dws-title .dws-original{flex:0 0 auto;overflow:visible;text-overflow:clip}',
       '.dws-time{flex:none;color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:17px;padding-left:6px}',
       // The shipped rows swap the trailing time for the action buttons on hover, so
       // at rest nothing reserves that trailing width.
@@ -185,8 +193,29 @@
       '.dws-crumb{border:none;background:transparent;padding:0;color:var(--dsw-alias-label-tertiary);cursor:pointer;',
       'max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}',
       '.dws-crumb:hover{color:var(--dsw-alias-label-primary)}',
+      // The conversation menu's "add workspace" row: first in the list, accent text and
+      // weight so it reads as the primary action. The two backgrounds are deliberately
+      // the other way round: the resting state is the neutral tint and hovering is what
+      // lights the accent up.
+      '.dws-heroAdd{box-sizing:border-box;flex:none;display:flex;align-items:center;gap:8px;width:100%;margin:0 0 6px;padding:8px 10px;',
+      'border:none;border-radius:var(--dsw-radius-sm);background:var(--dsw-alias-interactive-bg-hover);',
+      'color:var(--dsw-alias-state-business-primary);font-size:13px;line-height:20px;font-weight:510;white-space:nowrap;',
+      'cursor:pointer;text-align:start}',
+      '.dws-heroAdd:hover{background:var(--dsw-alias-interactive-bg-hover-accent)}',
+      '.dws-heroAdd:disabled{opacity:.5;cursor:default}',
+      '.dws-heroAddLabel{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}',
       '.dws-dialogBody{flex:1 1 auto;min-height:0;min-width:0;display:flex;flex-direction:column}',
-      '.dws-dialogToolbar{flex:none;display:flex;align-items:center;gap:8px;padding:8px 14px 8px 24px;min-width:0}',
+      // Passed as the host Modal's `contentClassName`: making this column a bounded
+      // flex box is what keeps the footer reachable and lets the tree scroll, since
+      // the host's own `body` element in between cannot be styled directly.
+      '.dws-pickerContent{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;overflow:hidden}',
+      // Breathing room under the dialog buttons: without it they sit flush against
+      // the bottom edge of the frame.
+      '.dws-pickerFooter{padding-bottom:10px}',
+      '.dws-dialogToolbar{flex:none;display:flex;align-items:center;gap:8px;padding:2px 14px 6px 24px;min-width:0}',
+      // The single root-path line that replaced the crumb trail.
+      '.dws-pickerPath{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;',
+      'color:var(--dsw-alias-label-secondary);font-size:13px;line-height:20px}',
       '.dws-pickerTree{flex:1 1 auto;min-height:0;max-height:min(46vh,420px);overflow-y:auto;overflow-x:hidden;',
       'padding:0 10px 8px 18px}',
       '.dws-pickerTree::-webkit-scrollbar{width:5px}',
@@ -202,15 +231,14 @@
       '.dws-pickerRow--selected:hover{background:var(--dsw-alias-state-business-primary);color:#fff}',
       '.dws-pickerName{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;',
       'line-height:20px}',
-      '.dws-pickerScroll{flex:none;max-height:min(22vh,200px);min-height:0;display:flex;flex-direction:column;',
-      'border-top:.5px solid var(--dsw-alias-border-l3)}',
-      '.dws-previewHead{flex:none;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 24px 4px;',
-      'color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px}',
-      '.dws-previewBody{flex:1 1 auto;min-height:0;overflow-x:auto;overflow-y:hidden;padding:0 24px 12px}',
-      '.dws-previewLine{display:flex;flex-direction:column;gap:2px;min-width:0}',
-      '.dws-previewNode{display:flex;align-items:center;gap:6px;min-width:0;white-space:nowrap}',
-      '.dws-previewName{display:inline-flex;align-items:baseline;gap:2px;min-width:0;cursor:text}',
-      '.dws-previewConnector{color:var(--dsw-alias-label-tertiary);font-size:12px;white-space:pre}',
+      // The row's "new subfolder" control: hidden until the row is hovered, and it
+      // inherits the row's colour so it stays legible on the blue hover background.
+      '.dws-addButton{flex:none;display:none;align-items:center;justify-content:center;width:22px;height:22px;padding:0;',
+      'border:none;border-radius:var(--dsw-radius-sm);background:transparent;color:inherit;cursor:pointer}',
+      '.dws-pickerRow:hover .dws-addButton,.dws-addButton:focus-visible{display:inline-flex}',
+      '.dws-addButton:hover{background:var(--dsw-alias-interactive-bg-hover)}',
+      // The inline naming row under the parent it will create into.
+      '.dws-pickerRow--editor{gap:6px;background:var(--dsw-alias-interactive-bg-hover)}',
       '.dws-dialogFooter{flex:none;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 24px;',
       'border-top:.5px solid var(--dsw-alias-border-l3)}',
       '.dws-footerNote{min-width:0;color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px;',
