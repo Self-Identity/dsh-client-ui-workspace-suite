@@ -134,8 +134,8 @@
       return E(ui.HoverCard, {
         anchor,
         content,
-        // Data marks (chart bars) open at once; text rows keep the shipped dwell so
-        // a pointer crossing a list does not flash cards.
+        // `immediate` callers (badges and other pointed-at marks) open at once; text
+        // rows keep the shipped dwell so a pointer crossing a list does not flash cards.
         openDelayMs: immediate === true ? 0 : 500,
         disabled: disabled === true,
       })

@@ -118,28 +118,20 @@
             onChange: (value) => writeSetting('includeSubagent', value),
           })),
           E(SettingRow, {
-            key: 'usageRange',
-            label: t('settings.usageRange'),
-          }, E(RowMenu, {
-            label: t('settings.usageRange'),
-            side: 'bottom',
-            triggerIcon: 'IconGaugeOutlineRegular',
-            triggerLabel: settings.usageRange === 'all' ? t('settings.rangeAll')
-              : settings.usageRange === 'd30' ? t('settings.range30') : t('settings.range7'),
-            items: [
-              { id: 'd7', label: t('settings.range7') },
-              { id: 'd30', label: t('settings.range30') },
-              { id: 'all', label: t('settings.rangeAll') },
-            ],
-            onSelect: (value) => writeSetting('usageRange', value),
-          })),
-          E(SettingRow, {
             key: 'readme',
             label: t('settings.readme'),
           }, E(SuiteSwitch, {
             checked: settings.readme === true,
             label: t('settings.readme'),
             onChange: (value) => writeSetting('readme', value),
+          })),
+          E(SettingRow, {
+            key: 'showEnv',
+            label: t('settings.showEnv'),
+          }, E(SuiteSwitch, {
+            checked: settings.showEnv === true,
+            label: t('settings.showEnv'),
+            onChange: (value) => writeSetting('showEnv', value),
           })),
           E(SettingRow, {
             key: 'readmeMaxHeightPct',

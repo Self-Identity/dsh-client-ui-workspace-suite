@@ -13,8 +13,9 @@
  *      declare its children: the child-hole declaration is exclusive and
  *      re-declaring it throws, so this entry renders its own row menus.
  *   3. sidebar.panellist + main keyed 'workspace-suite.overview'
- *      a per-workspace overview page: token totals, per-day chart, the fully
- *      expanded tree, turn jump links and the root README.
+ *      a per-workspace overview page: token totals, the fully expanded tree,
+ *      turn jump links and the root README. (The per-day chart was removed at
+ *      the user's request.)
  *   4. plugins.bundle.config (keyed by the package name)
  *      the settings card in the Plugins panel, where each module is switched
  *      and the shared options are edited.

@@ -18,8 +18,8 @@
       showTurns: true,
       includeArchived: true,
       includeSubagent: true,
-      usageRange: 'd7',
       readme: true,
+      showEnv: true,
       readmeMaxHeightPct: 45,
     }
 

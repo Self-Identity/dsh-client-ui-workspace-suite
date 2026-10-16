@@ -372,16 +372,33 @@
         // show a notice, never the blank pane the registration-level boundary leaves.
         // The message also goes into the on-disk boot record, so a later failure can
         // be read back instead of guessed at.
-        const guarded = (props) => E(QuietBoundary, {
-          fallback: () => E('div', { className: 'dws-page', 'data-panel': PANEL_ID },
-            E('div', { className: 'dws-pageBody' },
-              E('div', { className: 'dws-pageInner' },
-                E('div', { className: 'dws-card dws-empty' },
-                  (typeof props.t === 'function' ? props.t : (key) => key)('overview.failed'))))),
-          onError: (error) => reportBoot('overview-failed', String(error === null || error === undefined
-            ? 'unknown'
-            : (error.message === undefined ? error : error.message))),
-        }, E(SuiteOverview, props))
+        const guarded = (props) => {
+          // The target's sequence number changes on every overview request: it is both
+          // the reset key (so one failed render cannot stick) and the remount key (so
+          // per-workspace state never leaks from the page that was open before).
+          const target = overviewTargetStore.getSnapshot()
+          const seq = target === null || target === undefined ? 0 : target.seq
+          const translate = typeof props.t === 'function' ? props.t : (key) => key
+          return E(QuietBoundary, {
+            resetKey: seq,
+            fallback: (message) => E('div', { className: 'dws-page', 'data-panel': PANEL_ID, 'data-overview-seq': String(seq) },
+              E('div', { className: 'dws-pageBody' },
+                E('div', { className: 'dws-pageInner' },
+                  E('div', { className: 'dws-card dws-empty' }, [
+                    E('div', { key: 'text' }, translate('overview.failed')),
+                    // The message is shown, not only recorded: a failure the user can
+                    // read is a failure we can act on.
+                    E('div', {
+                      key: 'detail',
+                      className: 'dws-muted',
+                      style: { marginTop: '6px', fontSize: '12px', overflowWrap: 'anywhere' },
+                    }, String(message === null || message === undefined ? '' : message)),
+                  ])))),
+            onError: (error) => reportBoot('overview-failed', String(error === null || error === undefined
+              ? 'unknown'
+              : (error.message === undefined ? error : error.message))),
+          }, E(SuiteOverview, Object.assign({ key: 'overview:' + String(seq) }, props)))
+        }
         registerIn('main', {
           name: 'main',
           key: PANEL_ID,

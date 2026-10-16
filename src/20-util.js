@@ -61,7 +61,7 @@
     class QuietBoundary extends React.Component {
       constructor(props) {
         super(props)
-        this.state = { failed: false }
+        this.state = { failed: false, message: null }
       }
 
       static getDerivedStateFromError() {
@@ -70,6 +70,11 @@
 
       componentDidCatch(error) {
         warn('component crashed', error)
+        this.setState({
+          message: error === null || error === undefined
+            ? 'unknown'
+            : String(error.message === undefined ? error : error.message),
+        })
         if (typeof this.props.onError === 'function') {
           try {
             this.props.onError(error)
@@ -79,9 +84,19 @@
         }
       }
 
+      componentDidUpdate(previous) {
+        // A sticky failure is worse than the failure itself: without this, one bad
+        // render (for example a projection that was not ready yet) kept the fallback
+        // on screen for every later navigation. The caller passes a key that changes
+        // whenever the content is supposed to be different.
+        if (this.state.failed && previous.resetKey !== this.props.resetKey) {
+          this.setState({ failed: false, message: null })
+        }
+      }
+
       render() {
         if (this.state.failed) {
-          return typeof this.props.fallback === 'function' ? this.props.fallback() : null
+          return typeof this.props.fallback === 'function' ? this.props.fallback(this.state.message) : null
         }
         return this.props.children
       }
@@ -233,8 +248,8 @@
     /**
      * Compact token figure for the row/total **badges**: 1500 -> 1.5K,
      * 15000000 -> 15M. Every other token figure on the overview — hover cards,
-     * model rows, the totals line and the chart ticks — uses {@link formatCount}
-     * and prints exact digits with thousands separators.
+     * model rows and the totals line — uses {@link formatCount} and prints exact
+     * digits with thousands separators.
      */
     function formatTokens(value) {
       const n = typeof value === 'number' && Number.isFinite(value) ? value : 0
@@ -310,6 +325,64 @@
 
     /** The projection key this bundle's host half registers. */
     const USAGE_KEY = 'workspaceSuiteUsage'
+
+    /**
+     * The top-level files the environment card probes by **reading** them. The
+     * directory seam cannot help here: the browse backend's `list` filters every
+     * non-directory out, so a file's existence can only be discovered by asking for
+     * its content (an unreadable file is simply reported as absent).
+     */
+    const ENV_PROBE_FILES = ['package.json', 'tsconfig.json', 'Dockerfile', '.nvmrc']
+
+    /** Child directory names from one listing, keeping the host's own spelling. */
+    function directoryNames(listing) {
+      const entries = listing === null || listing === undefined
+        ? []
+        : (Array.isArray(listing.entries) ? listing.entries : listing)
+      const names = []
+      for (const entry of Array.isArray(entries) ? entries : []) {
+        if (entry === null || typeof entry !== 'object') continue
+        const name = typeof entry.name === 'string' && entry.name.length > 0 ? entry.name : baseName(entry.path)
+        if (typeof name === 'string' && name.length > 0) names.push(name)
+      }
+      return names
+    }
+
+    /**
+     * The few facts the overview shows about one `package.json`. Pure, so a malformed
+     * file reports `parseError` instead of throwing inside a render.
+     */
+    function packageSummary(text) {
+      if (typeof text !== 'string' || text.trim().length === 0) return null
+      let parsed = null
+      try {
+        parsed = JSON.parse(text)
+      } catch {
+        return { parseError: true }
+      }
+      if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return { parseError: true }
+      const count = (value) => (value !== null && typeof value === 'object' ? Object.keys(value).length : 0)
+      return {
+        name: typeof parsed.name === 'string' ? parsed.name : '',
+        version: typeof parsed.version === 'string' ? parsed.version : '',
+        private: parsed.private === true,
+        scripts: count(parsed.scripts),
+        dependencies: count(parsed.dependencies),
+        devDependencies: count(parsed.devDependencies),
+        engines: parsed.engines !== null && typeof parsed.engines === 'object' ? parsed.engines : {},
+        packageManager: typeof parsed.packageManager === 'string' ? parsed.packageManager : '',
+        moduleType: typeof parsed.type === 'string' ? parsed.type : '',
+      }
+    }
+
+    /** One `engines: node >=18` style figure, or an empty string when undeclared. */
+    function enginesSummary(engines) {
+      if (engines === null || engines === undefined || typeof engines !== 'object') return ''
+      return Object.keys(engines)
+        .sort()
+        .map((key) => key + ' ' + String(engines[key]))
+        .join(' \u00B7 ')
+    }
 
     /** Sum of the four durable usage buckets. */
     function sumBuckets(buckets) {

@@ -100,10 +100,10 @@
       const byId = sessionList === null || sessionList.byId === undefined ? {} : sessionList.byId
       const tree = React.useMemo(() => buildWorkspaceTree(items), [items])
       const [rootId, setRootId] = React.useState(null)
-      const [range, setRange] = React.useState(settings.usageRange === undefined ? 'd7' : settings.usageRange)
       const [readme, setReadme] = React.useState(null)
       const [readmeError, setReadmeError] = React.useState(null)
       const [warmTicket, setWarmTicket] = React.useState(0)
+      const [env, setEnv] = React.useState(null)
       const overviewTarget = React.useSyncExternalStore(overviewTargetStore.subscribe, overviewTargetStore.getSnapshot)
       React.useEffect(() => {
         if (overviewTarget.workspaceId !== null) setRootId(overviewTarget.workspaceId)
@@ -242,14 +242,52 @@
         // eslint-disable-next-line react-hooks/exhaustive-deps
       }, [root === undefined ? '' : root.path, settings.readme, subtreeSessionIds.join(','), warmTicket])
 
-      const days = React.useMemo(() => {
-        // The window is always the last 7 or 30 calendar days ending today, so the
-        // range control always has an axis and a day without usage reads as zero
-        // instead of dropping out (which used to empty the whole chart).
-        return recentDays(range === 'd30' ? 30 : 7)
-      }, [range])
-
-      const dayMax = days.reduce((max, day) => Math.max(max, sumDayModels(subtreeUsage.days[day])), 0)
+      // Dependencies and environment: one directory listing (child directories only —
+      // the browse backend never reports files) plus a handful of top-level file
+      // probes read through the workspace-files Remote. Nothing recurses, so the card
+      // costs a fixed, small number of calls.
+      React.useEffect(() => {
+        if (settings.showEnv !== true || root === undefined || typeof root.path !== 'string') {
+          setEnv(null)
+          return undefined
+        }
+        const authorization = subtreeSessionIds[0] === undefined ? Object.keys(byId)[0] : subtreeSessionIds[0]
+        const base = normalizePath(root.path)
+        let cancelled = false
+        setEnv({ status: 'loading' })
+        const readOne = (name) => (authorization === undefined || typeof services.readFile !== 'function'
+          ? Promise.resolve(null)
+          : Promise.resolve(services.readFile(authorization, base + '/' + name))
+            .then((text) => (typeof text === 'string' && text.length > 0 ? text : null))
+            .catch(() => null))
+        const list = typeof services.listDirectory === 'function'
+          ? Promise.resolve(services.listDirectory(root.path))
+            .then((listing) => directoryNames(listing))
+            .catch(() => [])
+          : Promise.resolve([])
+        Promise.all([list].concat(ENV_PROBE_FILES.map(readOne)))
+          .then((results) => {
+            if (cancelled) return
+            const dirs = Array.isArray(results[0]) ? results[0] : []
+            const probes = {}
+            for (let index = 0; index < ENV_PROBE_FILES.length; index += 1) {
+              probes[ENV_PROBE_FILES[index]] = results[index + 1] !== null && results[index + 1] !== undefined
+            }
+            setEnv({
+              status: 'ready',
+              dirs,
+              probes,
+              pkg: packageSummary(results[1]),
+            })
+          })
+          .catch((reason) => {
+            if (!cancelled) setEnv({ status: 'error', message: errorMessage(reason) })
+          })
+        return () => {
+          cancelled = true
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, [root === undefined ? '' : root.path, settings.showEnv, subtreeSessionIds.join(','), warmTicket])
 
       /** Hover content listing the per-model split of one bucket map. */
       const modelContent = (models, title) => E('div', { className: 'dws-hoverCard' }, [
@@ -512,56 +550,6 @@
         return rows
       }
 
-      const chart = E('div', { className: 'dws-card' }, [
-        E('div', { key: 'head', className: 'dws-cardHead' }, [
-          E('h3', { key: 'title', className: 'dws-cardTitle' }, t('overview.chart.title')),
-          E(RowMenu, {
-            key: 'range',
-            label: t('overview.chart.title'),
-            side: 'bottom',
-            triggerIcon: 'IconGaugeOutlineRegular',
-            triggerLabel: range === 'd30' ? t('overview.chart.range30') : t('overview.chart.range7'),
-            items: [
-              { id: 'd7', label: t('overview.chart.range7'), icon: icon('IconDataOutlineRegular', 16) },
-              { id: 'd30', label: t('overview.chart.range30'), icon: icon('IconDataOutlineRegular', 16) },
-            ],
-            onSelect: (value) => {
-              setRange(value)
-              writeSetting('usageRange', value)
-            },
-          }),
-        ]),
-        E('div', { key: 'chart', className: 'dws-chart' }, [
-          // The value axis: three ticks read off the same scale the bars use.
-          E('div', { key: 'y', className: 'dws-chartY' }, [
-            E('span', { key: 'max' }, formatCount(dayMax)),
-            E('span', { key: 'mid' }, formatCount(Math.round(dayMax / 2))),
-            E('span', { key: 'zero' }, '0'),
-          ]),
-          E('div', { key: 'plot', className: 'dws-chartPlot' }, [
-            E('div', { key: 'bars', className: 'dws-chartBars' }, days.map((day) => {
-              const models = subtreeUsage.days[day] || {}
-              const value = sumDayModels(models)
-              const height = dayMax <= 0 ? 0 : Math.max(2, Math.round((value / dayMax) * 140))
-              return SuiteHover({
-                key: day,
-                immediate: true,
-                anchor: E('div', { className: 'dws-chartBarWrap', title: day + ' \u00B7 ' + formatCount(value) }, [
-                  E('div', { className: 'dws-chartFill', style: { height: String(height) + 'px' } }),
-                ]),
-                content: modelContent(models, t('overview.chart.day', { date: day }) + ' \u00B7 ' + formatCount(value)),
-              })
-            })),
-            // The day axis: the window's first day, its midpoint and its last day.
-            E('div', { key: 'x', className: 'dws-chartX' }, [
-              E('span', { key: 'from' }, days.length === 0 ? '' : days[0]),
-              E('span', { key: 'mid' }, days.length === 0 ? '' : days[Math.floor(days.length / 2)]),
-              E('span', { key: 'to' }, days.length === 0 ? '' : days[days.length - 1]),
-            ]),
-          ]),
-        ]),
-      ])
-
       const header = E('div', { className: 'dws-pageHeader' }, [
         E('div', { key: 'heading', className: 'dws-pageHeading' }, [
           E('div', { key: 'titleRow', className: 'dws-pageTitleRow' }, [
@@ -599,20 +587,101 @@
         ]),
       ])
 
+      /**
+       * The dependencies/environment card. Every figure comes from the top level only:
+       * the listed child directories plus the probed files.
+       */
+      const renderEnvCard = () => {
+        if (settings.showEnv !== true || env === null) return null
+        const head = (extra) => E('div', { key: 'head', className: 'dws-cardHead' }, [
+          E('h3', { key: 'title', className: 'dws-cardTitle' }, t('overview.env.title')),
+          extra === undefined ? null : extra,
+        ])
+        if (env.status === 'loading') {
+          return E('div', { key: 'env', className: 'dws-card' }, [
+            head(),
+            E('div', { key: 'loading', className: 'dws-muted' }, t('overview.env.loading')),
+          ])
+        }
+        if (env.status === 'error') {
+          return E('div', { key: 'env', className: 'dws-card' }, [
+            head(),
+            E('div', { key: 'error', className: 'dws-muted' }, t('overview.env.error', { message: env.message })),
+          ])
+        }
+        const dirs = Array.isArray(env.dirs) ? env.dirs.slice() : []
+        const notable = ['.git', '.github', 'node_modules', 'src', 'test', 'tests', 'dist', 'build', 'docs', 'scripts', 'deploy', 'coverage']
+        const shown = dirs.sort((left, right) => {
+          const rank = (name) => {
+            const index = notable.indexOf(name.toLowerCase())
+            return index === -1 ? notable.length : index
+          }
+          const gap = rank(left) - rank(right)
+          return gap !== 0 ? gap : left.localeCompare(right)
+        }).slice(0, 12)
+        const pkg = env.pkg
+        const facts = []
+        if (pkg === null) {
+          facts.push(E('span', { key: 'pkgNone', className: 'dws-muted' }, t('overview.env.pkgMissing')))
+        } else if (pkg.parseError === true) {
+          facts.push(E('span', { key: 'pkgBad', className: 'dws-muted' }, t('overview.env.parseError')))
+        } else {
+          facts.push(E('span', { key: 'pkgName', className: 'dws-statValue' },
+            (pkg.name.length > 0 ? pkg.name : t('overview.env.unnamed')) + (pkg.version.length > 0 ? '@' + pkg.version : '')))
+          facts.push(E('span', { key: 'pkgManager', className: 'dws-chip' },
+            t('overview.env.manager') + ': ' + (pkg.packageManager.length > 0 ? pkg.packageManager : t('overview.env.managerNone'))))
+          facts.push(E('span', { key: 'pkgScripts', className: 'dws-chip' }, t('overview.env.scripts') + ': ' + String(pkg.scripts)))
+          facts.push(E('span', { key: 'pkgDeps', className: 'dws-chip' },
+            t('overview.env.deps') + ': ' + String(pkg.dependencies) + ' / ' + String(pkg.devDependencies)))
+          if (pkg.moduleType.length > 0) {
+            facts.push(E('span', { key: 'pkgType', className: 'dws-chip' }, 'type: ' + pkg.moduleType))
+          }
+          const engines = enginesSummary(pkg.engines)
+          if (engines.length > 0) {
+            facts.push(E('span', { key: 'pkgEngines', className: 'dws-chip' }, t('overview.env.engines') + ': ' + engines))
+          }
+        }
+        const chips = (Object.keys(env.probes === undefined ? {} : env.probes)).map((name) => E('span', {
+          key: 'probe:' + name,
+          className: 'dws-chip ' + (env.probes[name] === true ? 'dws-chip--on' : 'dws-chip--off'),
+        }, name))
+        return E('div', { key: 'env', className: 'dws-card' }, [
+          head(),
+          E('div', { key: 'dirs', className: 'dws-cardHead' }, [
+            E('span', { key: 'label', className: 'dws-statLabel' },
+              t('overview.env.dirs') + ': ' + String(dirs.length)),
+            E('div', { key: 'row', className: 'dws-chipRow' }, dirs.length === 0
+              ? E('span', { className: 'dws-muted' }, '\u2014')
+              : shown.map((name) => E('span', { key: 'dir:' + name, className: 'dws-chip', title: name }, name))),
+          ]),
+          E('div', { key: 'facts', className: 'dws-statRow' }, facts),
+          E('div', { key: 'probes', className: 'dws-cardHead' }, [
+            E('span', { key: 'label', className: 'dws-statLabel' }, t('overview.env.probes')),
+            E('div', { key: 'row', className: 'dws-chipRow' }, chips),
+          ]),
+        ])
+      }
+
       // Scroll on the body, centre the cards in a 960px column: the same shape
       // the shipped entry pages use, so the panel cannot rely on a parent height.
       const body = E('div', { className: 'dws-pageBody' }, [E('div', { key: 'inner', className: 'dws-pageInner' }, [
-        // A workspace with no session has nothing to chart: say so instead of
-        // rendering an empty frame, which read as a blank page.
+        // A workspace with no session still says so instead of rendering nothing.
         sessionIdsOf(subtreeIds).length === 0
           ? E('div', { key: 'empty', className: 'dws-card dws-empty' }, t('overview.empty'))
-          : chart,
-        E('div', { key: 'tree', className: 'dws-card' }, [
-          E('div', { key: 'head', className: 'dws-cardHead' }, [
-            E('h3', { key: 'title', className: 'dws-cardTitle' }, t('overview.tree.title')),
-          ]),
-          ...(root === undefined ? [E('div', { key: 'empty', className: 'dws-empty' }, t('overview.tree.empty'))] : renderWorkspace(root, 0)),
-        ]),
+          : null,
+        // Each card carries its own boundary: one section that cannot render must not
+        // take the page (or the workspace switch that led here) down with it.
+        E(QuietBoundary, {
+          key: 'envBoundary',
+          fallback: () => E('div', { className: 'dws-card dws-empty' }, t('overview.failed')),
+        }, renderEnvCard()),
+        E(QuietBoundary, { key: 'treeBoundary', fallback: () => E('div', { className: 'dws-card dws-empty' }, t('overview.failed')) },
+          E('div', { key: 'tree', className: 'dws-card' }, [
+            E('div', { key: 'head', className: 'dws-cardHead' }, [
+              E('h3', { key: 'title', className: 'dws-cardTitle' }, t('overview.tree.title')),
+            ]),
+            ...(root === undefined ? [E('div', { key: 'empty', className: 'dws-empty' }, t('overview.tree.empty'))] : renderWorkspace(root, 0)),
+          ])),
         // Only a README that actually read shows a card; otherwise the section is
         // absent rather than an empty frame.
         settings.readme === true && readme !== null ? E('div', { key: 'readme', className: 'dws-card' }, [

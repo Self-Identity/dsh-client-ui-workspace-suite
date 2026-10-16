@@ -96,6 +96,11 @@
       // created in (a path accepted asynchronously must not toggle a stale map).
       const selectedRef = React.useRef(selected)
       selectedRef.current = selected
+      // The inline naming editor commits on blur as well as on Enter, so its draft and
+      // an in-flight flag must be readable from a handler outside this render.
+      const newFolderRef = React.useRef(null)
+      newFolderRef.current = newFolder
+      const newFolderBusy = React.useRef(false)
       // Click bookkeeping for the shortened double-click window. This MUST be a hook
       // call in every render, so it lives here with the other hooks — placing it
       // after the `open !== true` early return made the hook count differ between
@@ -518,6 +523,7 @@
                 event.preventDefault()
                 event.stopPropagation()
                 setOpen(entry.path, true)
+                newFolderBusy.current = false
                 setNewFolder({ parent: entry.path, name: '', error: null })
               },
             }, icon('IconProjectAddOutlineRegular', 14)),
@@ -538,6 +544,14 @@
                 placeholder: t('picker.newFolder.placeholder'),
                 'aria-label': t('picker.newFolder'),
                 onClick: (event) => event.stopPropagation(),
+                // Clicking away from the editor creates the folder too — an empty
+                // name simply closes it. Escape still cancels without creating.
+                onBlur: () => {
+                  const draft = newFolderRef.current
+                  if (draft === null) return
+                  if (String(draft.name === undefined ? '' : draft.name).trim().length === 0) setNewFolder(null)
+                  else commitNewFolder()
+                },
                 onChange: (event) => setNewFolder({ ...newFolder, name: event.target.value, error: null }),
                 onKeyDown: (event) => {
                   if (event.key === 'Enter') {
@@ -758,10 +772,14 @@
        * selection, then focused.
        */
       const commitNewFolder = () => {
-        const draft = newFolder
-        if (draft === null) return
+        const draft = newFolderRef.current
+        if (draft === null || newFolderBusy.current === true) return
         const name = String(draft.name === undefined ? '' : draft.name).trim()
-        if (name.length === 0) return
+        // An empty name just abandons the editor: nothing is created.
+        if (name.length === 0) {
+          setNewFolder(null)
+          return
+        }
         const record = nodes.get(foldPath(draft.parent))
         const siblings = record === undefined || record.status !== 'ready' || !Array.isArray(record.listing.entries)
           ? []
@@ -774,6 +792,9 @@
           setNewFolder({ ...draft, error: t('picker.newFolder.unavailable') })
           return
         }
+        // One create per editor: a blur that follows the Enter that started this call
+        // must not create the folder twice.
+        newFolderBusy.current = true
         Promise.resolve(createDirectory(draft.parent, name))
           .then(() => {
             const created = normalizePath(draft.parent + '/' + name)
@@ -788,7 +809,10 @@
             if (!selectedRef.current.has(foldPath(created))) toggleSelect(created)
             focusPath(created)
           })
-          .catch((reason) => setNewFolder({ ...draft, error: errorMessage(reason) }))
+          .catch((reason) => {
+            newFolderBusy.current = false
+            setNewFolder({ ...draft, error: errorMessage(reason) })
+          })
       }
 
       /** Enter the chooser's folder as a fresh session in its workspace. */

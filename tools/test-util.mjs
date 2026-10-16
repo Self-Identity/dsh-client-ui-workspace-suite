@@ -30,6 +30,7 @@ const names = [
   'buildWorkspaceTree', 'collectSubtree', 'ancestorsOf', 'chainForPath', 'formatTokens',
   'sumBuckets', 'dayKey', 'relativeTime', 'errorMessage', 'timestamp',
   'usageViewOf', 'boundCall', 'USAGE_KEY',
+  'directoryNames', 'packageSummary', 'enginesSummary', 'ENV_PROBE_FILES',
 ]
 
 const preamble = [
@@ -61,7 +62,34 @@ const {
   normalizePath, isAncestorPath, baseName, workspaceTitle, buildWorkspaceTree, parentPathsOf,
   collectSubtree, ancestorsOf, chainForPath, formatTokens, sumBuckets, dayKey, relativeTime,
   errorMessage, timestamp, usageViewOf, boundCall, USAGE_KEY,
+  directoryNames, packageSummary, enginesSummary, ENV_PROBE_FILES,
 } = exported
+
+/* --------------------------- dependencies card ---------------------------- */
+
+// The browse backend's listing carries child directories only, so the card's
+// directory row must read names out of that shape however the host spells it.
+check('directoryNames objects', directoryNames({ entries: [{ name: 'src' }, { path: 'C:/p/dist', name: '' }] }).join('|'),
+  'src|dist')
+check('directoryNames array form', directoryNames([{ name: 'a' }, { name: 'b' }]).join('|'), 'a|b')
+check('directoryNames junk', directoryNames(null).length, 0)
+check('probe list', ENV_PROBE_FILES.join('|'), 'package.json|tsconfig.json|Dockerfile|.nvmrc')
+{
+  const summary = packageSummary(JSON.stringify({
+    name: 'demo', version: '1.2.3', private: true, type: 'module',
+    packageManager: 'pnpm@9.0.0', engines: { node: '>=18' },
+    scripts: { build: 'x', test: 'y' }, dependencies: { a: '1' }, devDependencies: { b: '1', c: '1' },
+  }))
+  check('packageSummary name', summary.name + '@' + summary.version, 'demo@1.2.3')
+  check('packageSummary counts', [summary.scripts, summary.dependencies, summary.devDependencies].join('/'), '2/1/2')
+  check('packageSummary manager', summary.packageManager, 'pnpm@9.0.0')
+  check('packageSummary engines', enginesSummary(summary.engines), 'node >=18')
+  check('packageSummary type', summary.moduleType, 'module')
+}
+check('packageSummary empty text', packageSummary(''), null)
+check('packageSummary malformed', packageSummary('{oops').parseError, true)
+check('packageSummary array json', packageSummary('[1,2]').parseError, true)
+check('enginesSummary empty', enginesSummary(undefined), '')
 
 /* --------------------------------- paths ---------------------------------- */
 
