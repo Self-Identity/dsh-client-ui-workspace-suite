@@ -385,7 +385,10 @@
           }, title),
           total === undefined ? null : tokenBadge('tokens', total, view.models || {}, t('overview.sessionTokens')),
           E('span', { key: 'actions', className: 'dws-rowActions', onClick: (event) => event.stopPropagation(), style: { opacity: 1 } }, [
-            RowMenu({
+            // Rendered as a component, never called as a function: `RowMenu` owns
+            // hooks, and calling it inline would fold them into this page's hook list,
+            // so the row count would change the hook count (React error #300).
+            E(RowMenu, {
               key: 'menu',
               label: t('browser.more'),
               menuLabel: title,
@@ -504,7 +507,7 @@
                 Promise.resolve(services.startSession(workspace.workspaceId)).catch((reason) => warn('start session failed', reason))
               },
             }),
-            RowMenu({
+            E(RowMenu, {
               key: 'menu',
               label: t('browser.more'),
               menuLabel: workspaceTitle(workspace, t('browser.folder')),

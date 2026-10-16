@@ -13,7 +13,7 @@
  * Usage: node tools/test-manifest.mjs
  */
 
-import { existsSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -133,6 +133,64 @@ for (const locale of ['en', 'zh']) {
   if (typeof parsed.meta.description !== 'string' || parsed.meta.description.length === 0) {
     fail(path + ' has no meta.description')
   }
+}
+
+/* ------------------------- hooks stay inside components ------------------ */
+
+/*
+ * Calling a component that owns hooks as a plain function folds those hooks into
+ * the *caller's* hook list, so a data-dependent call site (a per-row menu, say)
+ * makes the hook count vary with the data. React then throws error #300/#310 and
+ * the pane degrades to its boundary notice — exactly the "overview fails when
+ * jumping to another workspace" bug this guard exists to prevent from returning.
+ *
+ * The hook-owning set is discovered, not hard-coded: any `function Name(` whose
+ * body up to the next top-level function mentions `React.use`.
+ */
+{
+  const partDir = join(root, 'src')
+  const parts = readdirSync(partDir).filter((name) => name.endsWith('.js')).sort()
+  const sources = parts.map((name) => ({ name, text: readFileSync(join(partDir, name), 'utf8') }))
+  const widgets = sources.find((part) => part.name === '35-widgets.js')
+  const hookOwning = new Set()
+  if (widgets !== undefined) {
+    const starts = []
+    const pattern = /^\s{4}function\s+([A-Za-z_$][\w$]*)\s*\(/gm
+    let match = pattern.exec(widgets.text)
+    while (match !== null) {
+      starts.push({ name: match[1], index: match.index })
+      match = pattern.exec(widgets.text)
+    }
+    for (let index = 0; index < starts.length; index += 1) {
+      const from = starts[index].index
+      const to = index + 1 < starts.length ? starts[index + 1].index : widgets.text.length
+      // `useXxx` names are hooks, not components: calling those directly is the point.
+      if (!/^use[A-Z]/.test(starts[index].name) && /React\.use/.test(widgets.text.slice(from, to))) {
+        hookOwning.add(starts[index].name)
+      }
+    }
+  }
+  if (hookOwning.size === 0) fail('the hook-owning scan found nothing; it stopped working')
+  for (const part of sources) {
+    const lines = part.text.split('\n')
+    for (let number = 0; number < lines.length; number += 1) {
+      const line = lines[number]
+      for (const name of hookOwning) {
+        let index = line.indexOf(name + '(')
+        while (index !== -1) {
+          const before = line.slice(0, index).trimEnd()
+          const isDefinition = /\bfunction\s+$/.test(before) || before.endsWith('function')
+          const isElement = before.endsWith('E(') || before.endsWith(',')
+          if (!isDefinition && !isElement) {
+            fail(part.name + ':' + String(number + 1) + ' calls the hook-owning component ' + name
+              + ' as a function; render it with E(' + name + ', {...}) instead')
+          }
+          index = line.indexOf(name + '(', index + 1)
+        }
+      }
+    }
+  }
+  console.log('hook placement: ' + String(hookOwning.size) + ' hook-owning component(s) checked')
 }
 
 /* --------------------------------- files --------------------------------- */
