@@ -170,12 +170,20 @@
       'border-radius:var(--dsw-radius-sm);border:.5px solid var(--dsw-alias-border-l3);background:var(--dsw-alias-bg-layer-1);',
       'color:var(--dsw-alias-label-primary);outline:none}',
       '.dws-input:focus-visible{border-color:var(--dsw-alias-state-business-primary)}',
-      '.dws-switch{flex:none;position:relative;width:34px;height:20px;border:none;border-radius:10px;padding:0;',
-      'background:var(--dsw-alias-interactive-bg-hover);cursor:pointer;transition:background .15s ease}',
-      '.dws-switch[aria-checked="true"]{background:var(--dsw-alias-state-business-primary)}',
-      '.dws-switch::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;',
-      'background:var(--dsw-alias-bg-layer-1);transition:transform .15s ease}',
-      '.dws-switch[aria-checked="true"]::after{transform:translateX(14px)}',
+      // Switch replicating the shipped control's geometry and tokens (the shell's own
+      // `_switch_` rule): 36x20 with a 2px inset, a border-l3 track when off (the old
+      // hover-bg track read as plain white on the card), brand-primary when on, and a
+      // 16px thumb that switches to `switch-thumb` while off.
+      '.dws-switch{box-sizing:border-box;position:relative;flex:0 0 auto;width:36px;height:20px;padding:2px;',
+      'border:0;border-radius:999px;background:var(--dsw-alias-border-l3);cursor:pointer}',
+      '.dws-switch:disabled{cursor:default;opacity:.5}',
+      '.dws-switch:focus-visible{outline:var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));',
+      'outline-offset:2px}',
+      '.dws-switch[aria-checked="true"]{background:var(--dsw-alias-brand-primary)}',
+      '.dws-switch::after{content:"";display:block;width:16px;height:16px;border-radius:50%;',
+      'background:var(--dsw-alias-label-primary-foreground);transition:transform .12s ease}',
+      '.dws-switch[aria-checked="false"]::after{background:var(--dsw-alias-switch-thumb)}',
+      '.dws-switch[aria-checked="true"]::after{transform:translateX(16px)}',
       '.dws-check{flex:none;display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;padding:0;',
       'border-radius:4px;border:1px solid var(--dsw-alias-border-l4);background:transparent;cursor:pointer;',
       'color:var(--dsw-alias-label-primary-inverted)}',
@@ -249,7 +257,10 @@
 
       /* ---- overview page ---- */
       '.dws-page{box-sizing:border-box;height:100%;min-height:0;min-width:0;display:flex;flex-direction:column;',
-      'color:var(--dsw-alias-label-primary)}',
+      // The page owns its scrolling: without this the host pane could scroll the whole
+      // page and the visible scrollbar would be the host's (a different width from the
+      // workspace list's).
+      'overflow:hidden;color:var(--dsw-alias-label-primary)}',
       '.dws-pageHeader{flex:none;display:flex;align-items:flex-start;gap:12px;padding:28px clamp(24px,4vw,48px) 12px;min-width:0}',
       // On macOS the frame mounts the leading seat over every main panel, so the
       // heading pads below it exactly like the shipped entry pages do.
@@ -293,6 +304,37 @@
       'font-size:11px;line-height:16px;cursor:pointer;white-space:nowrap;font-variant-numeric:tabular-nums}',
       '.dws-turnLink:hover{color:var(--dsw-alias-state-business-primary);text-decoration:underline}',
       '.dws-readme{box-sizing:border-box;min-width:0;overflow-y:auto;overflow-wrap:anywhere;font-size:13px;line-height:20px}',
+      // ---- rendered README (the plugin's own markdown renderer) ----
+      // GitHub-ish rhythm with theme tokens: headings above their text, code in a
+      // layer-2 box, tables with hairline borders, links in the business colour.
+      '.dws-md{display:block;min-width:0}',
+      '.dws-md>:first-child{margin-top:0}',
+      '.dws-md>:last-child{margin-bottom:0}',
+      '.dws-mdPara{margin:0 0 10px;white-space:pre-wrap}',
+      '.dws-mdHeading{margin:18px 0 8px;font-weight:600;line-height:1.35;overflow-wrap:anywhere}',
+      '.dws-md h1{font-size:20px;padding-bottom:6px;border-bottom:.5px solid var(--dsw-alias-border-l3)}',
+      '.dws-md h2{font-size:17px;padding-bottom:4px;border-bottom:.5px solid var(--dsw-alias-border-l3)}',
+      '.dws-md h3{font-size:15px}',
+      '.dws-md h4,.dws-md h5,.dws-md h6{font-size:13px}',
+      '.dws-mdList{margin:0 0 10px;padding-inline-start:22px}',
+      '.dws-mdList li{margin:2px 0;overflow-wrap:anywhere}',
+      '.dws-md code{font-family:var(--dsh-font-mono,ui-monospace,SFMono-Regular,Menlo,monospace);font-size:12px;',
+      'background:var(--dsw-alias-bg-layer-2);border-radius:4px;padding:1px 5px;overflow-wrap:anywhere}',
+      '.dws-mdCode{box-sizing:border-box;margin:0 0 12px;padding:10px 12px;border-radius:6px;overflow:auto;',
+      'background:var(--dsw-alias-bg-layer-2);border:.5px solid var(--dsw-alias-border-l3)}',
+      '.dws-mdCode code{display:block;padding:0;background:none;font-size:12px;line-height:18px;white-space:pre}',
+      '.dws-mdQuote{margin:0 0 12px;padding:2px 12px;border-inline-start:3px solid var(--dsw-alias-border-l3);',
+      'color:var(--dsw-alias-label-secondary)}',
+      '.dws-mdRule{border:0;border-top:.5px solid var(--dsw-alias-border-l3);margin:16px 0}',
+      '.dws-mdTable{box-sizing:border-box;display:block;max-width:100%;overflow-x:auto;border-collapse:collapse;',
+      'margin:0 0 12px;font-size:12.5px}',
+      '.dws-mdTable th,.dws-mdTable td{border:.5px solid var(--dsw-alias-border-l3);padding:5px 10px;',
+      'text-align:start;vertical-align:top;white-space:nowrap}',
+      '.dws-mdTable th{background:var(--dsw-alias-bg-layer-2);font-weight:600}',
+      '.dws-md a{color:var(--dsw-alias-state-business-primary);text-decoration:none}',
+      '.dws-md a:hover{text-decoration:underline}',
+      '.dws-md strong{font-weight:600}',
+      '.dws-md del{opacity:.65}',
       '.dws-readme--empty{color:var(--dsw-alias-label-tertiary)}',
       '.dws-settings{display:flex;flex-direction:column;gap:16px;min-width:0;padding:4px 0 16px}',
       '.dws-settingsGroup{display:flex;flex-direction:column;gap:2px;min-width:0}',

@@ -17,6 +17,9 @@ import vm from 'node:vm'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const source = readFileSync(join(root, 'src', '20-util.js'), 'utf8')
+// The markdown renderer (25-markdown.js) shares this closure and only needs `E`, so it
+// is evaluated with the same stub and its parsers become testable too.
+const markdownSource = readFileSync(join(root, 'src', '25-markdown.js'), 'utf8')
 
 const problems = []
 const check = (label, actual, expected) => {
@@ -32,7 +35,7 @@ const names = [
   'usageViewOf', 'boundCall', 'USAGE_KEY',
   'directoryNames', 'packageSummary', 'enginesSummary', 'ENV_PROBE_FILES',
   'selectionStep', 'isBoundaryPath', 'isSiblingPath', 'parentPathOf', 'scrollbarWidthOf', 'mergeSettings',
-  'comparePathNatural', 'subtreeOfPath',
+  'comparePathNatural', 'subtreeOfPath', 'markdownBlocks', 'markdownInline', 'isSafeHref',
 ]
 
 const preamble = [
@@ -48,12 +51,15 @@ const preamble = [
   '  useSyncExternalStore: () => undefined,',
   '};',
   'const document = undefined;',
+  // The bundle's element helper lives outside 20-util.js; the markdown renderer needs
+  // it, so the harness supplies a shape-preserving stub.
+  'const E = (type, props, ...children) => ({ type, props, children });',
 ].join('\n')
 
 const exported = vm.runInNewContext(
-  preamble + '\n' + source + '\n;({' + names.join(', ') + '})',
+  preamble + '\n' + source + '\n' + markdownSource + '\n;({' + names.join(', ') + '})',
   { console: { warn: () => {} }, setTimeout, clearTimeout, Number, Object, Array, String, Date, JSON, Math, Promise, Error, Map, Set, AbortController },
-  { filename: 'src/20-util.js' },
+  { filename: 'src/20-util.js + src/25-markdown.js' },
 )
 
 for (const name of names) {
@@ -66,8 +72,34 @@ const {
   errorMessage, timestamp, usageViewOf, boundCall, USAGE_KEY,
   directoryNames, packageSummary, enginesSummary, ENV_PROBE_FILES,
   selectionStep, isBoundaryPath, isSiblingPath, parentPathOf, scrollbarWidthOf, mergeSettings,
-  comparePathNatural, subtreeOfPath,
+  comparePathNatural, subtreeOfPath, markdownBlocks, markdownInline, isSafeHref,
 } = exported
+
+/* --------------------------- markdown renderer ---------------------------- */
+
+// The README card used to print the raw file because the host renderer is absent
+// from this client build; these parsers are what replaced it.
+const mdKinds = (text) => markdownBlocks(text).map((block) => block.kind).join(',')
+check('markdown: heading then list', mdKinds('# Title\n\n- a\n- b'), 'heading,list')
+check('markdown: list item count', markdownBlocks('- a\n- b\n- c')[0].items.length, 3)
+check('markdown: ordered list', markdownBlocks('1. a\n2. b')[0].ordered, true)
+check('markdown: fenced code keeps its body',
+  markdownBlocks('```js\nconst a = 1\n```')[0].text, 'const a = 1')
+check('markdown: fenced code language', markdownBlocks('```js\nx\n```')[0].lang, 'js')
+check('markdown: table head/rows',
+  (() => {
+    const table = markdownBlocks('| a | b |\n| --- | --- |\n| 1 | 2 |')[0]
+    return table.kind + ':' + table.head.length + ':' + table.rows.length
+  })(), 'table:2:1')
+check('markdown: quote', mdKinds('> quoted'), 'quote')
+check('markdown: rule', mdKinds('---'), 'rule')
+check('markdown: paragraph groups lines', markdownBlocks('one\ntwo')[0].text, 'one\ntwo')
+check('markdown: unsafe href rejected', isSafeHref('javascript:alert(1)'), false)
+check('markdown: https href allowed', isSafeHref('https://example.com/x'), true)
+check('markdown: inline keeps plain text around elements',
+  markdownInline('a **b** c').filter((part) => typeof part === 'string').join('|'), 'a | c')
+check('markdown: inline code becomes an element',
+  markdownInline('`x`').length, 1)
 
 /* --------------------- hero chooser: natural path order -------------------- */
 

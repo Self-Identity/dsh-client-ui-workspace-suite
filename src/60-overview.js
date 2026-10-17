@@ -624,11 +624,11 @@
         }).slice(0, 12)
         const pkg = env.pkg
         const facts = []
-        if (pkg === null) {
-          facts.push(E('span', { key: 'pkgNone', className: 'dws-muted' }, t('overview.env.pkgMissing')))
-        } else if (pkg.parseError === true) {
+        // No package.json: say nothing at all (the card still shows the directory and
+        // probe chips), instead of a line explaining what is missing.
+        if (pkg !== null && pkg.parseError === true) {
           facts.push(E('span', { key: 'pkgBad', className: 'dws-muted' }, t('overview.env.parseError')))
-        } else {
+        } else if (pkg !== null) {
           facts.push(E('span', { key: 'pkgName', className: 'dws-statValue' },
             (pkg.name.length > 0 ? pkg.name : t('overview.env.unnamed')) + (pkg.version.length > 0 ? '@' + pkg.version : '')))
           facts.push(E('span', { key: 'pkgManager', className: 'dws-chip' },
@@ -657,7 +657,7 @@
               ? E('span', { className: 'dws-muted' }, '\u2014')
               : shown.map((name) => E('span', { key: 'dir:' + name, className: 'dws-chip', title: name }, name))),
           ]),
-          E('div', { key: 'facts', className: 'dws-statRow' }, facts),
+          facts.length === 0 ? null : E('div', { key: 'facts', className: 'dws-statRow' }, facts),
           E('div', { key: 'probes', className: 'dws-cardHead' }, [
             E('span', { key: 'label', className: 'dws-statLabel' }, t('overview.env.probes')),
             E('div', { key: 'row', className: 'dws-chipRow' }, chips),

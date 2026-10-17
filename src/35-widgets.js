@@ -465,12 +465,15 @@
       }
     }
 
-    /** Markdown body: the host renderer when present, preformatted text otherwise. */
+    /**
+     * Markdown body: the host renderer when this client build ships one, otherwise the
+     * plugin's own renderer (see `markdownNodes`). The previous fallback was a `<pre>`
+     * of the raw file, which is why a README looked like plain text.
+     */
     function SuiteMarkdown({ text, t }) {
       const labels = React.useMemo(() => markdownLabels(t), [t])
       if (hasPrimitive('MarkdownText')) return E(ui.MarkdownText, { text, labels })
-      return E('div', { className: 'dws-readme' },
-        E('pre', { style: { margin: 0, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' } }, text))
+      return E('div', { className: 'dws-readme dws-md' }, markdownNodes(text))
     }
 
     /** A token-styled badge. */
