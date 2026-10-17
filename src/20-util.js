@@ -208,6 +208,49 @@
       return out
     }
 
+    /**
+     * Natural, locale-independent directory-path comparison.
+     *
+     * Numeric segments compare as numbers, so `1, 2, 3, 10` keep their obvious order
+     * instead of sorting lexicographically (`1, 10, 2, 3`); a shorter path sorts before
+     * the longer path it prefixes, i.e. a parent before its children.
+     */
+    function comparePathNatural(left, right) {
+      const a = foldPath(left).split('/')
+      const b = foldPath(right).split('/')
+      const length = Math.min(a.length, b.length)
+      for (let index = 0; index < length; index += 1) {
+        if (a[index] === b[index]) continue
+        const leftNumber = Number(a[index])
+        const rightNumber = Number(b[index])
+        const leftIsNumber = a[index] !== '' && Number.isFinite(leftNumber)
+        const rightIsNumber = b[index] !== '' && Number.isFinite(rightNumber)
+        if (leftIsNumber && rightIsNumber) return leftNumber - rightNumber
+        if (leftIsNumber !== rightIsNumber) return leftIsNumber ? -1 : 1
+        return a[index] < b[index] ? -1 : 1
+      }
+      return a.length - b.length
+    }
+
+    /**
+     * [root, ...descendants] in natural path order.
+     *
+     * The hero workspace menu used the host snapshot's own order for its subtree
+     * chooser, which came out reversed (`root - 4 - 3 - 2 - 1`); sorting by path makes
+     * the list read top-down like the directory tree itself.
+     */
+    function subtreeOfPath(items, rootItem) {
+      const out = [rootItem]
+      const rest = []
+      for (const item of items) {
+        if (item === rootItem) continue
+        if (!isAncestorPath(rootItem.path, item.path)) continue
+        rest.push(item)
+      }
+      rest.sort((left, right) => comparePathNatural(left.path, right.path))
+      return out.concat(rest)
+    }
+
     /** Ancestor chain of one workspace, outermost first. */
     function ancestorsOf(parentOf, workspaceId) {
       const out = []

@@ -32,6 +32,7 @@ const names = [
   'usageViewOf', 'boundCall', 'USAGE_KEY',
   'directoryNames', 'packageSummary', 'enginesSummary', 'ENV_PROBE_FILES',
   'selectionStep', 'isBoundaryPath', 'isSiblingPath', 'parentPathOf', 'scrollbarWidthOf', 'mergeSettings',
+  'comparePathNatural', 'subtreeOfPath',
 ]
 
 const preamble = [
@@ -65,7 +66,28 @@ const {
   errorMessage, timestamp, usageViewOf, boundCall, USAGE_KEY,
   directoryNames, packageSummary, enginesSummary, ENV_PROBE_FILES,
   selectionStep, isBoundaryPath, isSiblingPath, parentPathOf, scrollbarWidthOf, mergeSettings,
+  comparePathNatural, subtreeOfPath,
 } = exported
+
+/* --------------------- hero chooser: natural path order -------------------- */
+
+// The subtree chooser used the host snapshot's order, which listed the children
+// reversed (root - 4 - 3 - 2 - 1). Sorting by path makes it read root - 1 - 2 - 3.
+const subtreeFixture = [
+  { workspaceId: 'r4', path: 'C:/w/4' },
+  { workspaceId: 'r2', path: 'C:/w/2' },
+  { workspaceId: 'root', path: 'C:/w' },
+  { workspaceId: 'r10', path: 'C:/w/10' },
+  { workspaceId: 'r1', path: 'C:/w/1' },
+  { workspaceId: 'other', path: 'C:/x/9' },
+]
+check('subtrees: root first, children naturally ordered',
+  subtreeOfPath(subtreeFixture, subtreeFixture[2]).map((item) => item.workspaceId).join(','),
+  'root,r1,r2,r4,r10')
+check('paths: numeric segments compare as numbers', comparePathNatural('C:/w/2', 'C:/w/10') < 1, true)
+check('paths: a prefix sorts first', comparePathNatural('C:/w', 'C:/w/1') < 1, true)
+check('paths: case-insensitive', comparePathNatural('C:/W/a', 'c:/w/b') < 1, true)
+check('paths: equal prefix depth', comparePathNatural('C:/w/1', 'C:/w/1'), 0)
 
 /* ------------------------- settings default merge -------------------------- */
 

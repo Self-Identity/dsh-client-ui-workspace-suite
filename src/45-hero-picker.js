@@ -35,7 +35,10 @@
 
       const isRoot = (item) => !items.some((other) => other !== item && isAncestorPath(other.path, item.path))
       const roots = items.filter(isRoot)
-      const subtreeOf = (item) => [item].concat(items.filter((other) => other !== item && isAncestorPath(item.path, other.path)))
+      // The chooser lists the whole subtree top-down (root first, descendants in natural
+      // path order). Using the snapshot's own order listed the children reversed
+      // (`root - 4 - 3 - 2 - 1`) because the host ordering is not a path order.
+      const subtreeOf = (item) => subtreeOfPath(items, item)
       const depthIn = (subtree, item) => subtree.filter((other) => other !== item && isAncestorPath(other.path, item.path)).length
       const labelOf = (item) => workspaceTitle(item, t('browser.folder'))
       // The add entry is offered whenever this plugin holds the picker's own services;
