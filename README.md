@@ -126,11 +126,28 @@ DSH 官方客户端（Electron 桌面版）的工作区套件插件：把「工�
 ## 安装
 
 1. 客户端侧边栏 → **插件** → **添加插件**；
-2. 填本目录绝对路径：`F:\DSH-Official\plugins\dsh-client-ui-workspace-suite`；
+2. 填本目录绝对路径：`F:\DSH-Official-Plugins\dsh-client-ui-workspace-suite`；
 3. **安装** → **立即启用**；
 4. 若卡片提示「改动在下次启动生效」，重启客户端。
 
 profile 由客户端自己写入，请勿手工改 `profiles\desktop\package.json` / `cordis.patch.yml`。
+
+> **目录迁移记录（2026-10）**：本插件的源码目录已从 `F:\DSH-Official\plugins\<包名>` 迁到 **`F:\DSH-Official-Plugins\<包名>`**（同批迁移的还有 `dsh-preset-requirement-confirm` 与 `dsh-host-mobile-gateway`）。旧路径保留为**目录联接（Junction）**指向新位置，所以仍按旧路径引用的配置不会断；profile 的依赖路径与 `node_modules` 联接已直接指向新根。
+
+## 版本兼容
+
+目标宿主版本：**`@deepseek-ai/dsh-desktop-runtime 0.2.1-rc.1`**（配套 `@deepseek-ai/dsh-client-ui-workspace 0.2.1-rc.1`）。已对照该版本重新解包 `app.asar` 逐项核对：
+
+| 依赖的契约 | 0.2.1-rc.1 实测 | 说明 |
+|---|---|---|
+| 平台种子词 `react` / `@deepseek-ai/dsh-client-store` / `@deepseek-ai/dsh-client-ui-primitives` | ✅ 仍在 `staticModules` 里 | 这三个包不再以 `node_modules` 形态出现（被内联进 web 壳），但**种子词不变**，`require` 仍可解析 |
+| 插槽 id `sidebar.workspaces`、`sidebar.workspaces.directoryFlow`、`conversation.hero.workspace`、`conversation.hero.workspace.directoryFlow` | ✅ 全部存在 | 本插件接管/占位所依赖的四个插槽未改名 |
+| 组合行 `- id: directory-picker`（`@deepseek-ai/dsh-host-directory-picker-auto`） | ✅ 仍在 `dsh-web-app/cordis.patch.yml` | 本补丁"禁用该行 + 插入 browse 后端"的做法继续成立 |
+| `workspace-files` 行（`remote.workspaceFiles`） | ✅ 存在 | README 卡片与依赖卡的文件读取依赖它 |
+| 原语 `Menu` / `MenuItemButton` / `Modal` / `HoverCard` / `MarkdownText` / `Tooltip` 与 25 个图标名 | ✅ 全部存在 | 缺任何一个仍会走本插件自带的降级实现 |
+| 服务 `slots`/`locale`/`sessions`/`workspaces`/`uiWorkspace`/`layout`/`remote` 及其被调方法（`using`/`search`/`refreshProjections`/`create`/`delete`/`rename`/`getSnapshot`/`pickDirectory`/`listDirectory`/`openSession`/`startSession`/…） | ✅ 均被出厂 `dsh-client-ui-workspace` 以同名方式调用 | 说明契约未变；本插件对每个调用仍走容错包装（`boundCall`），缺方法只降级不抛错 |
+
+因此**本次升级不需要改代码**；若将来宿主改契约，先跑 `node tools/build.mjs` + 九项校验，再对照上表排查。
 
 ## 排查"启用了但界面没变化"
 
