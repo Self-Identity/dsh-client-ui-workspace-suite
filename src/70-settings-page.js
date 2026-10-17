@@ -99,6 +99,21 @@
             onChange: (value) => writeSetting('readmeMaxHeightPct', value),
           })),
         ]),
+        settingGroup('look', 'settings.group.look', [
+          E(SettingRow, {
+            key: 'scrollbarWidth',
+            label: t('settings.scrollbarWidth'),
+            hint: t('settings.scrollbarWidth.hint'),
+          }, E(SuiteNumber, {
+            value: settings.scrollbarWidth,
+            min: 4,
+            max: 20,
+            step: 1,
+            label: t('settings.scrollbarWidth'),
+            suffix: 'px',
+            onChange: (value) => writeSetting('scrollbarWidth', value),
+          })),
+        ]),
         E('div', { key: 'actions', style: { display: 'flex', justifyContent: 'flex-end' } },
           E(SuiteButton, { onClick: resetSettings }, t('settings.reset'))),
       ])

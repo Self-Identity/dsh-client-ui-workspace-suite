@@ -22,6 +22,9 @@
       includeSubagent: true,
       readme: true,
       showEnv: true,
+      // Width of this plugin's own scrollbars, in px. The CSS chain falls back to
+      // the global `--dsh-scrollbar-width` (scrollbar-tuner plugin) and then to 8px.
+      scrollbarWidth: 8,
       readmeMaxHeightPct: 45,
     }
 

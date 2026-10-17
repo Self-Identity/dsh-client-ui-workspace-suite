@@ -708,13 +708,14 @@
       // A failure anywhere in the page degrades to a notice instead of the blank
       // white pane that a swallowed throw used to leave behind (and which then
       // persisted after switching to another workspace).
+      const pageStyle = { '--suite-scrollbar-width': scrollbarWidthOf(settings) }
       return E(QuietBoundary, {
-        fallback: () => E('div', { className: 'dws-page', 'data-panel': panelKey }, [
+        fallback: () => E('div', { className: 'dws-page', 'data-panel': panelKey, style: pageStyle }, [
           header,
           E('div', { className: 'dws-pageBody' }, E('div', { className: 'dws-pageInner' },
             E('div', { className: 'dws-card dws-empty' }, t('overview.failed')))),
         ]),
-      }, E('div', { className: 'dws-page', 'data-panel': panelKey }, [
+      }, E('div', { className: 'dws-page', 'data-panel': panelKey, style: pageStyle }, [
         header,
         body,
         dialogs.element,

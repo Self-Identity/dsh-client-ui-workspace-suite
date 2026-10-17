@@ -62,14 +62,13 @@
     function DirectoryExplorer(props) {
       const {
         open, busy, t, onPicked, onCancel, onError, ownCreate,
-        listDirectory, createWorkspace, renameWorkspace, createDirectory, startSession, mode,
+        listDirectory, createWorkspace, renameWorkspace, createDirectory, startSession,
       } = props
-      // "add" flows finish by asking which folder to enter; the row menu's "workspace
-      // selection" entry is a structure edit and just closes. The decision must follow
-      // the **explicit** `mode`: keying it off `ownCreate` instead hid the chooser for
-      // the sidebar's own add button, whose dialog instance always passes ownCreate.
-      // Only a caller that passes no mode at all falls back to that old signal.
-      const isAddFlow = mode === 'add' || (mode === undefined && ownCreate === undefined)
+      // This dialog only ever serves an "add workspace" flow (the two conversation /
+      // sidebar holes and the sidebar's add button), so it always finishes by asking
+      // which of the confirmed folders to enter. There is no selection-only mode left:
+      // moving existing sessions between workspaces is not something a client API can
+      // do, and the row menu's old entry for it was removed.
       // The settings snapshot may be supplied by the caller (the workspace
       // browser already holds one); otherwise this dialog reads the store.
       const liveSettings = useSettings()
@@ -177,34 +176,10 @@
       }
 
       /**
-       * Pre-select the folders the dialog was opened with, so a dialog opened
-       * from a workspace menu mirrors the current workspace state instead of
-       * starting empty.
+       * The dialog is an "add workspace" dialog only (the old "workspace selection"
+       * entry is gone): it always starts blank, and `finish` always ends by asking
+       * which of the confirmed folders to enter.
        */
-      const seedSelection = () => {
-        const seeds = typeof props.initialPaths === 'function'
-          ? props.initialPaths()
-          : Array.isArray(props.initialPaths)
-            ? props.initialPaths
-            // No explicit seed: start blank. "Add workspace" must not pre-check the
-            // existing workspaces; only the row menu's "workspace selection" entry
-            // passes `initialPaths` to mirror the current state.
-            : []
-        const paths = (Array.isArray(seeds) ? seeds : [])
-          .filter((value) => typeof value === 'string' && value.length > 0)
-          .slice(0, 40)
-        if (paths.length === 0) return
-        setSelected((previous) => {
-          const next = new Map(previous)
-          for (const value of paths) {
-            const key = foldPath(value)
-            if (next.has(key)) continue
-            next.set(key, { path: value, remark: remarkFor(value) })
-          }
-          return next
-        })
-        for (const value of paths.slice(0, 12)) revealPath(value)
-      }
 
       const toggle = React.useCallback((path) => {
         setExpanded((previous) => {
@@ -317,7 +292,6 @@
               const homeListing = drives.map((drive) => drive.listing).find((listing) => toStringOr(listing.home, '') !== '')
               const home = homeListing === undefined ? '' : homeListing.home
               if (home !== '') preload(home, 0)
-              seedSelection()
               return undefined
             }
             // No probeable drive (POSIX host, or every letter refused): fall back
@@ -330,7 +304,6 @@
               }
               publishRoot(listing)
               for (const entry of listing.entries.slice(0, 2)) preload(entry.path, 0)
-              seedSelection()
               return undefined
             })
           })
@@ -602,9 +575,9 @@
         setError(null)
         const finish = () => {
           setCreating(false)
-          if (isAddFlow && typeof startSession === 'function') {
-            // The add flow asks which of the confirmed folders to enter rather than
-            // guessing on the user's behalf; the selection entry just closes.
+          if (typeof startSession === 'function') {
+            // Every use of this dialog is an add flow: ask which of the confirmed
+            // folders to enter instead of guessing on the user's behalf.
             const confirmed = selectionOrder()
             setEntryChoice(confirmed.length > 0 ? confirmed[0].path : null)
             setEntryOpen(true)
@@ -870,7 +843,11 @@
         return rootPath
       })()
 
-      const body = E('div', { className: 'dws-dialogBody' }, [
+      const body = E('div', {
+        className: 'dws-dialogBody',
+        // Scopes this plugin's scrollbar width to the dialog's directory tree.
+        style: { '--suite-scrollbar-width': scrollbarWidthOf(settings) },
+      }, [
         E('div', { key: 'crumbs', className: 'dws-dialogToolbar' }, [
           pathDraft === null
             ? E('div', { key: 'trail', className: 'dws-crumbs', style: { flex: '1 1 auto' } }, [

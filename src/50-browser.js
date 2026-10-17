@@ -75,15 +75,11 @@
       const [dialog, setDialog] = React.useState(null)
       const [notice, setNotice] = React.useState(null)
       const [pickerOpen, setPickerOpen] = React.useState(false)
-      // Which entry opened the inline picker: "add" starts blank and ends with the
-      // "which workspace do you enter?" chooser, exactly like the conversation
-      // window's add flow; "select" mirrors the current workspaces and just closes.
-      // One dialog instance serves both, so the intent has to travel with the open.
-      const [pickerMode, setPickerMode] = React.useState('add')
-      const openPicker = (mode) => {
-        setPickerMode(mode)
-        setPickerOpen(true)
-      }
+      // The inline picker only ever serves the "add workspace" flow now: the row
+      // menu's old "workspace selection" entry is gone (it is not possible to move
+      // existing sessions between workspaces — a session's workspace comes from its
+      // cwd, which no client API can change), so there is no second intent to pass.
+      const openPicker = () => setPickerOpen(true)
       const noticeTimer = React.useRef(null)
 
       const workspaceState = useWorkspaces === null ? null : useWorkspaces((state) => state)
@@ -127,6 +123,44 @@
 
       const runAction = (work) => {
         Promise.resolve().then(work).catch((reason) => showNotice(t('browser.failed', { message: errorMessage(reason) })))
+      }
+
+      /** True when the host refused an archive because the session still has work running. */
+      const isActiveRefusal = (reason) => {
+        if (reason === null || reason === undefined) return false
+        const rpcError = reason.rpcError
+        const code = rpcError === null || rpcError === undefined ? '' : String(rpcError.code || '')
+        const message = String(reason.message === undefined ? reason : reason.message)
+        return code === 'workspace/session-active' || message.indexOf('session-active') !== -1
+      }
+
+      /**
+       * Archive or restore one session.
+       *
+       * The service face exposes `archive` / `unarchive`; the previous call sites used
+       * the service's own `archiveSession` method name, which does not exist on that
+       * face, so every click was rejected before it ever reached the host.
+       *
+       * A session whose turn/subagent/job is still running is refused with
+       * `workspace/session-active`. The shipped UI confirms that case and retries with
+       * `{ stopActivity: true }`; this dialog asks the same question instead of failing
+       * silently.
+       */
+      const toggleArchive = (row, force) => {
+        const stop = force === true
+        const work = row.archived
+          ? boundCall(services, 'unarchive', row.id)
+          : boundCall(services, 'archive', row.id, stop ? { stopActivity: true } : undefined)
+        Promise.resolve().then(work).catch((reason) => {
+          if (row.archived !== true && stop !== true && isActiveRefusal(reason)) {
+            const label = row.summary === undefined
+              ? String(row.id)
+              : toStringOr(row.summary.displayTitle, toStringOr(row.summary.title, row.id))
+            setDialog({ kind: 'archive-active', id: row.id, name: label })
+            return
+          }
+          showNotice(t('browser.failed', { message: errorMessage(reason) }))
+        })
       }
 
       /** Sessions shown under one workspace, honouring the archive filter. */
@@ -346,9 +380,7 @@
               label: row.archived ? t('browser.unarchive') : t('browser.archive'),
               iconName: row.archived ? 'IconUnarchiveOutlineRegular' : 'IconArchiveOutlineRegular',
               size: 14,
-              onClick: () => runAction(row.archived
-                ? boundCall(services, 'unarchiveSession', row.id)
-                : boundCall(services, 'archiveSession', row.id)),
+              onClick: () => toggleArchive(row),
             }),
             E(RowMenu, {
               key: 'menu',
@@ -378,8 +410,7 @@
                 if (id === 'rename') setDialog({ kind: 'rename-session', id: row.id, draft: title })
                 else if (id === 'fork') runAction(boundCall(services, 'forkSession', row.id))
                 else if (id === 'pin') runAction(row.pinned ? boundCall(services, 'unpinSession', row.id) : boundCall(services, 'pinSession', row.id))
-                else if (id === 'unarchive') runAction(boundCall(services, 'unarchiveSession', row.id))
-                else if (id === 'archive') runAction(boundCall(services, 'archiveSession', row.id))
+                else if (id === 'unarchive' || id === 'archive') toggleArchive(row)
               },
             }),
           ]),
@@ -514,14 +545,12 @@
               menuLabel: workspaceTitle(workspace, t('browser.folder')),
               items: [
                 { id: 'new', label: t('browser.newSessionIn'), icon: icon('IconNewChatOutlineRegular', 16), shortcut: shortcutOf('session.new') },
-                { id: 'pick', label: t('browser.pickWorkspace'), icon: icon('IconBrowseOutlineRegular', 16), shortcut: shortcutOf('workspace.add') },
                 { id: 'overview', label: t('browser.overview'), icon: icon('IconDataOutlineRegular', 16) },
                 { id: 'rename', label: t('browser.renameWorkspace'), icon: icon('IconEditOutlineRegular', 16) },
                 { id: 'delete', label: t('browser.deleteWorkspace'), icon: icon('IconTrashOutlineRegular', 16), danger: true },
               ],
               onSelect: (id) => {
                 if (id === 'new') runAction(boundCall(services, 'startSession', workspace.workspaceId))
-                else if (id === 'pick') openPicker('select')
                 else if (id === 'overview') services.openOverview(workspace.workspaceId)
                 else if (id === 'rename') setDialog({ kind: 'rename-workspace', id: workspace.workspaceId, draft: customTitle.length > 0 ? customTitle : baseName(workspace.path) })
                 else if (id === 'delete') setDialog({ kind: 'delete-workspace', id: workspace.workspaceId, name: workspaceTitle(workspace, t('browser.folder')) })
@@ -665,7 +694,7 @@
             label: t('browser.add'),
             iconName: 'IconProjectAddOutlineRegular',
             size: 16,
-            onClick: () => openPicker('add'),
+            onClick: () => openPicker(),
           }),
         ]
         : [
@@ -688,7 +717,7 @@
             pressed: anyCollapsed,
             onClick: () => setAllExpanded(anyCollapsed),
           }),
-          E(IconButton, { key: 'add', label: t('browser.add'), iconName: 'IconProjectAddOutlineRegular', size: 18, onClick: () => openPicker('add') }),
+          E(IconButton, { key: 'add', label: t('browser.add'), iconName: 'IconProjectAddOutlineRegular', size: 18, onClick: () => openPicker() }),
         ])
 
       const body = (() => {
@@ -911,8 +940,36 @@
             t('browser.deleteCascade', { n: doomed.length, names: preview + (names.length > 6 ? '\u2026' : '') })),
         ])))
       }
+      if (dialog !== null && dialog.kind === 'archive-active') {
+        // The host refused the archive because this session still has work running.
+        // Confirm once, then archive with `stopActivity: true` (shipped behaviour).
+        dialogs.push(E(SuiteModal, {
+          key: 'archiveActive',
+          open: true,
+          onClose: () => setDialog(null),
+          title: t('browser.archiveActiveTitle'),
+          closeLabel: t('common.close'),
+          footer: E(React.Fragment, null, [
+            E(SuiteButton, { key: 'cancel', variant: 'outline', onClick: () => setDialog(null) }, t('common.cancel')),
+            E(SuiteButton, {
+              key: 'ok',
+              variant: 'primary',
+              onClick: () => {
+                const id = dialog.id
+                setDialog(null)
+                toggleArchive({ id, archived: false }, true)
+              },
+            }, t('browser.archiveActiveConfirm')),
+          ]),
+        }, E('div', { style: { fontSize: '13px', lineHeight: '20px' } },
+          t('browser.archiveActiveBody', { name: dialog.name }))))
+      }
 
-      return E('div', { className: 'dws-root' + (wide ? '' : ' dws-root--rail') }, [
+      return E('div', {
+        className: 'dws-root' + (wide ? '' : ' dws-root--rail'),
+        // Scopes this plugin's scrollbar width to its own scroll areas.
+        style: { '--suite-scrollbar-width': scrollbarWidthOf(settings) },
+      }, [
         header,
         // The tree area carries the shipped bottom fade: the last rows dissolve into
         // the sidebar fill instead of ending on a hard edge above the account row.
@@ -927,7 +984,6 @@
           open: pickerOpen,
           t,
           settings,
-          mode: pickerMode,
           listDirectory: services.listDirectory,
           createDirectory: services.createDirectory,
           createWorkspace: services.createWorkspace,
@@ -935,16 +991,6 @@
           readWorkspaceItems: services.readWorkspaceItems,
           startSession: services.startSession,
           workspacesHook: useWorkspaces,
-          // Only the "workspace selection" entry mirrors the workspaces that exist
-          // right now; the add entries open blank and finish with the chooser, which
-          // is what the conversation window's add flow does too.
-          ...(pickerMode === 'select'
-            ? {
-              initialPaths: () => items
-                .filter((item) => item !== null && typeof item === 'object' && typeof item.path === 'string')
-                .map((item) => item.path),
-            }
-            : {}),
           ...(typeof services.pickDirectory === 'function' ? { pick: services.pickDirectory } : {}),
           ownCreate: (path) => services.createWorkspace({ path }),
           onPicked: () => {},

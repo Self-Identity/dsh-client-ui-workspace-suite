@@ -196,17 +196,21 @@ for (const locale of ['en', 'zh']) {
 /* --------------------- the add flow keeps its chooser -------------------- */
 
 /*
- * The picker withholds the "which workspace do you enter" chooser from selection
- * mode only. Keying that decision off `ownCreate` instead of the explicit `mode`
- * silently removed the chooser for the sidebar's own add button, whose dialog
- * instance always passes ownCreate.
+ * The picker is an "add workspace" dialog only: it must always end by asking which
+ * confirmed folder to enter, and the old selection-only mode (plus the row menu
+ * entry that opened it) is gone — moving existing sessions between workspaces is
+ * not something a client API can do.
  */
 {
   const pickerText = readFileSync(join(root, 'src', '40-picker.js'), 'utf8')
-  const declared = /const isAddFlow = (.+)/.exec(pickerText)
-  if (declared === null) fail('the picker no longer declares isAddFlow')
-  else if (!/mode === 'add'/.test(declared[1])) {
-    fail('isAddFlow must follow the explicit mode; keying it off ownCreate hides the entry chooser for the sidebar add button')
+  const browserText = readFileSync(join(root, 'src', '50-browser.js'), 'utf8')
+  if (!/setEntryOpen\(true\)/.test(pickerText)) {
+    fail('the picker no longer opens its post-submit entry chooser')
+  }
+  if (/\bisAddFlow\b/.test(pickerText)) fail('the picker still branches on isAddFlow; it is add-only now')
+  if (/id: 'pick'/.test(browserText)) fail('the workspace row menu still offers the removed "workspace selection" entry')
+  if (/'archiveSession'|'unarchiveSession'/.test(browserText)) {
+    fail("the browser still calls services.archiveSession/services.unarchiveSession; the face exposes archive/unarchive")
   }
 }
 

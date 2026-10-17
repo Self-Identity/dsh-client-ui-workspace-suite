@@ -33,7 +33,11 @@
       'padding:0;font-size:13px;line-height:20px;white-space:nowrap}',
       '.dws-scroll{flex:1 1 auto;min-height:0;min-width:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain}',
       '.dws-listWrap{position:relative;display:flex;flex-direction:column;flex:1 1 auto;min-height:0;min-width:0}',
-      '.dws-scroll::-webkit-scrollbar{width:5px}',
+      // Width chain for this plugin's own scrollbars: `--suite-scrollbar-width` (this
+      // plugin's setting) then `--dsh-scrollbar-width` (the global scrollbar-tuner
+      // plugin / theme) then an 8px fallback. Reusing the tuner's variable keeps a
+      // global setting and this plugin's own setting in step.
+      '.dws-scroll::-webkit-scrollbar{width:var(--suite-scrollbar-width,var(--dsh-scrollbar-width,8px))}',
       '.dws-scroll::-webkit-scrollbar-thumb{background:var(--dsw-alias-scrollbar-bg-l2);border-radius:3px}',
       '.dws-muted{color:var(--dsw-alias-label-tertiary)}',
       '.dws-secondary{color:var(--dsw-alias-label-secondary)}',
@@ -212,9 +216,14 @@
       'color:var(--dsw-alias-label-secondary);font-size:13px;line-height:20px}',
       '.dws-pickerTree{flex:1 1 auto;min-height:0;max-height:min(46vh,420px);overflow-y:auto;overflow-x:hidden;',
       'padding:0 10px 8px 18px}',
-      '.dws-pickerTree::-webkit-scrollbar{width:5px}',
+      '.dws-pickerTree::-webkit-scrollbar{width:var(--suite-scrollbar-width,var(--dsh-scrollbar-width,8px))}',
       '.dws-pickerTree::-webkit-scrollbar-thumb{background:var(--dsw-alias-scrollbar-bg-l2);border-radius:3px}',
       '.dws-pickerTree::-webkit-scrollbar-track{background:transparent}',
+      // The overview page's scroll areas follow the same width chain.
+      '.dws-pageBody::-webkit-scrollbar,.dws-readme::-webkit-scrollbar,.dws-modalBody::-webkit-scrollbar{',
+      'width:var(--suite-scrollbar-width,var(--dsh-scrollbar-width,8px))}',
+      '.dws-pageBody::-webkit-scrollbar-thumb,.dws-readme::-webkit-scrollbar-thumb,',
+      '.dws-modalBody::-webkit-scrollbar-thumb{background:var(--dsw-alias-scrollbar-bg-l2);border-radius:3px}',
       '.dws-pickerRow{box-sizing:border-box;display:flex;align-items:center;gap:6px;min-height:28px;padding:2px 8px;',
       'padding-inline-start:calc(8px + var(--suite-indent,0px));border-radius:var(--dsw-radius-sm);cursor:pointer;',
       'color:var(--dsw-alias-label-primary)}',

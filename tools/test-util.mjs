@@ -31,7 +31,7 @@ const names = [
   'sumBuckets', 'dayKey', 'relativeTime', 'errorMessage', 'timestamp',
   'usageViewOf', 'boundCall', 'USAGE_KEY',
   'directoryNames', 'packageSummary', 'enginesSummary', 'ENV_PROBE_FILES',
-  'selectionStep', 'isBoundaryPath', 'isSiblingPath', 'parentPathOf',
+  'selectionStep', 'isBoundaryPath', 'isSiblingPath', 'parentPathOf', 'scrollbarWidthOf',
 ]
 
 const preamble = [
@@ -64,8 +64,18 @@ const {
   collectSubtree, ancestorsOf, chainForPath, formatTokens, sumBuckets, dayKey, relativeTime,
   errorMessage, timestamp, usageViewOf, boundCall, USAGE_KEY,
   directoryNames, packageSummary, enginesSummary, ENV_PROBE_FILES,
-  selectionStep, isBoundaryPath, isSiblingPath, parentPathOf,
+  selectionStep, isBoundaryPath, isSiblingPath, parentPathOf, scrollbarWidthOf,
 } = exported
+
+/* ---------------------------- scrollbar width ----------------------------- */
+
+check('scrollbar: default is 8px', scrollbarWidthOf({}), '8px')
+check('scrollbar: missing settings', scrollbarWidthOf(undefined), '8px')
+check('scrollbar: honours the setting', scrollbarWidthOf({ scrollbarWidth: 12 }), '12px')
+check('scrollbar: clamps low', scrollbarWidthOf({ scrollbarWidth: 1 }), '4px')
+check('scrollbar: clamps high', scrollbarWidthOf({ scrollbarWidth: 99 }), '20px')
+check('scrollbar: rounds fractions', scrollbarWidthOf({ scrollbarWidth: 9.6 }), '10px')
+check('scrollbar: ignores junk', scrollbarWidthOf({ scrollbarWidth: 'wide' }), '8px')
 
 /* ---------------------- picker selection constraints ---------------------- */
 

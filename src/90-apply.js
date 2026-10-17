@@ -163,7 +163,7 @@
         forkSession: (sessionId) => boundCall(uiWorkspace, 'forkSession', sessionId),
         pin: (sessionId) => boundCall(uiWorkspace, 'pinSession', sessionId),
         unpin: (sessionId) => boundCall(uiWorkspace, 'unpinSession', sessionId),
-        archive: (sessionId) => boundCall(uiWorkspace, 'archiveSession', sessionId),
+        archive: (sessionId, options) => boundCall(uiWorkspace, 'archiveSession', sessionId, options),
         unarchive: (sessionId) => boundCall(uiWorkspace, 'unarchiveSession', sessionId),
         renameWorkspace: (workspaceId, title) => boundCall(workspaces, 'rename', workspaceId, title),
         deleteWorkspace: (workspaceId) => boundCall(workspaces, 'delete', workspaceId),

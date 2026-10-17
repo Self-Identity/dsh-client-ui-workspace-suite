@@ -326,6 +326,17 @@
     /** The projection key this bundle's host half registers. */
     const USAGE_KEY = 'workspaceSuiteUsage'
 
+    /**
+     * Width of this plugin's own scrollbars as a CSS length, clamped to the setting's
+     * 4–20px range with an 8px default. The stylesheet falls back to the global
+     * `--dsh-scrollbar-width` (the scrollbar-tuner plugin / theme) when this is unset.
+     */
+    function scrollbarWidthOf(settings) {
+      const raw = settings === undefined || settings === null ? undefined : Number(settings.scrollbarWidth)
+      const value = Number.isFinite(raw) ? Math.round(raw) : 8
+      return Math.min(20, Math.max(4, value)) + 'px'
+    }
+
     /** A drive root (`C:/`) or the POSIX root: a boundary, never a fillable parent. */
     function isBoundaryPath(path) {
       const raw = typeof path === 'string' ? path.trim() : ''

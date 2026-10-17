@@ -626,19 +626,36 @@ for (const { options, component } of registrations) {
     }
   }
   if (options.name === 'sidebar.workspaces') {
-    // The inline picker instance must open in the right flow: the sidebar's add
-    // button is an *add* flow (blank start + the post-submit entry chooser), and
-    // only the row menu's "workspace selection" mirrors the current workspaces.
+    // The inline picker is the "add workspace" dialog only: it has no mode, no seed,
+    // and it must carry the startSession face so its post-submit entry chooser works.
     const inlinePicker = budget.elements.find((entry) => entry.props !== null && typeof entry.props === 'object'
       && typeof entry.props.ownCreate === 'function')
     if (inlinePicker === undefined) fail('the workspace browser never rendered its picker dialog')
-    else if (inlinePicker.props.mode !== 'add') {
-      fail('the inline picker did not open in add mode (got ' + String(inlinePicker.props.mode)
-        + '); its entry chooser would never appear')
+    else if (inlinePicker.props.mode !== undefined) {
+      fail('the inline picker still receives a mode; the selection-only mode is gone')
     } else if (inlinePicker.props.initialPaths !== undefined) {
       fail('the inline picker seeded the current workspaces in add mode')
+    } else if (typeof services.startSession === 'function' && typeof inlinePicker.props.startSession !== 'function') {
+      fail('the inline picker has no startSession face, so its entry chooser could never run')
     } else {
-      console.log('  inline picker: add mode, no seed, chooser eligible')
+      console.log('  inline picker: add-only, no seed, entry chooser wired')
+    }
+    // The old "workspace selection" menu row must be gone: moving sessions between
+    // workspaces is not something a client API can do.
+    if (budget.strings.includes('browser.pickWorkspace')) {
+      fail('the workspace row menu still lists the removed "workspace selection" entry')
+    }
+    // This plugin's scrollbars follow its own width setting (8px by default).
+    const scrollbarVars = budget.elements
+      .filter((entry) => entry.props !== null && typeof entry.props === 'object'
+        && entry.props.style !== null && typeof entry.props.style === 'object'
+        && typeof entry.props.style['--suite-scrollbar-width'] === 'string')
+      .map((entry) => entry.props.style['--suite-scrollbar-width'])
+    if (scrollbarVars.length === 0) fail('the browser root does not scope --suite-scrollbar-width')
+    else if (scrollbarVars.some((value) => value !== '8px')) {
+      fail('the default scrollbar width is not 8px: ' + JSON.stringify(scrollbarVars))
+    } else {
+      console.log('  scrollbar width: 8px default on the plugin root')
     }
     // The indent ladder: nested rows sit 15px further left than the plain 12px
     // ladder (with a 3px floor), so the old first-level values must be gone.
@@ -761,10 +778,10 @@ if (railRegistration === undefined) {
 
 /* --------------------------- picker open flow ----------------------------- */
 
-// The dialog always probes the system root. Seeding the current workspace state is
-// opt-in (`initialPaths`) and belongs to the row menu's "workspace selection"
-// entry: the add-workspace holes must open blank, so they must NOT read the
-// registered workspace paths just to pre-check them.
+// The dialog always probes the system root and opens blank: there is no seeded
+// "workspace selection" mode left (the row menu entry that used it was removed,
+// because moving existing sessions between workspaces is not possible through a
+// client API). Handing the seat an `initialPaths` prop must therefore be ignored.
 await new Promise((resolve) => setTimeout(resolve, 60))
 const requested = new Set(directoryReads)
 if (directoryReads.length === 0) {
@@ -775,8 +792,7 @@ if (directoryReads.length === 0) {
   console.log('directory reads: ' + String(directoryReads.length) + ' (drives probed: ' + String(probed) + ')')
 }
 
-// An aligned render: handing the picker an explicit seed is what the row-menu entry
-// does, and it must still read those paths so the tree opens on them.
+// A leftover `initialPaths` prop must not seed anything any more.
 {
   const seat = originalRegistrations.find((entry) => entry.options.name === 'sidebar.workspaces.directoryFlow')
   if (seat === undefined) fail('the sidebar directory-flow seat is missing')
@@ -790,15 +806,16 @@ if (directoryReads.length === 0) {
         initialPaths: ['C:/projects/alpha', 'D:/other'],
       }), budget)
     } catch (error) {
-      fail('the seeded picker threw: ' + String(error && error.message ? error.message : error))
+      fail('the picker threw when handed a leftover initialPaths prop: '
+        + String(error && error.message ? error.message : error))
     }
-    // The open flow probes the drives first and seeds after those reads settle.
     await new Promise((resolve) => setTimeout(resolve, 80))
-    const seeded = new Set(directoryReads.slice(before))
-    for (const path of ['C:/projects/alpha', 'D:/other']) {
-      if (!seeded.has(path)) fail('a seeded picker did not read its seed path: ' + path)
-    }
-    console.log('seeded picker: read ' + String(seeded.size) + ' path(s) for its ' + '2 seed(s)')
+    const extra = new Set(directoryReads.slice(before))
+    if (extra.has('D:/other')) fail('the picker still reads an initialPaths seed it should ignore')
+    const selectedRows = budget.elements.filter((entry) => typeof entry.props.className === 'string'
+      && entry.props.className.includes('dws-pickerRow--selected')).length
+    if (selectedRows !== 0) fail('the picker rendered ' + String(selectedRows) + ' selected row(s) from a leftover initialPaths prop')
+    console.log('picker seeding: ignored a leftover initialPaths prop (0 selected rows)')
   }
 }
 
