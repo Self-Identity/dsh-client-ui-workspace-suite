@@ -214,6 +214,30 @@ for (const locale of ['en', 'zh']) {
   }
 }
 
+/* --------------------------- overview card order -------------------------- */
+
+/*
+ * The overview page reads top-down as: workspace/session tree, then the
+ * dependencies/environment card, then the README. The env card used to sit above
+ * the tree; a static order check keeps it below without needing an env fixture.
+ */
+{
+  const overviewText = readFileSync(join(root, 'src', '60-overview.js'), 'utf8')
+  const i18nText = readFileSync(join(root, 'src', '10-i18n.js'), 'utf8')
+  const treeIndex = overviewText.indexOf("key: 'treeBoundary'")
+  const envIndex = overviewText.indexOf("key: 'envBoundary'")
+  const readmeIndex = overviewText.indexOf("key: 'readme'")
+  if (treeIndex === -1 || envIndex === -1) fail('the overview lost one of its cards (treeBoundary / envBoundary)')
+  else if (envIndex < treeIndex) fail('the dependencies/environment card still comes before the workspace/session tree')
+  else if (readmeIndex !== -1 && readmeIndex < envIndex) fail('the README card is not the last card on the overview page')
+  if (!/'overview\.refresh': '\u5237\u65B0'/.test(i18nText)) {
+    fail('the overview refresh button is not labelled "刷新" (统计 must be gone)')
+  }
+  if (/'overview\.env\.probes': '[^']*[\uFF08\uFF09]/.test(i18nText)) {
+    fail('the env card probe label still carries its parenthetical hint')
+  }
+}
+
 /* --------------------------------- files --------------------------------- */
 
 for (const relative of ['lib/index.js', 'lib/client.js', 'README.md', 'cordis.patch.yml']) {

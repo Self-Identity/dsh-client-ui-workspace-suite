@@ -674,10 +674,8 @@
           : null,
         // Each card carries its own boundary: one section that cannot render must not
         // take the page (or the workspace switch that led here) down with it.
-        E(QuietBoundary, {
-          key: 'envBoundary',
-          fallback: () => E('div', { className: 'dws-card dws-empty' }, t('overview.failed')),
-        }, renderEnvCard()),
+        // Order: the workspace/session tree first (the page's subject), then the
+        // dependencies/environment card, then the README.
         E(QuietBoundary, { key: 'treeBoundary', fallback: () => E('div', { className: 'dws-card dws-empty' }, t('overview.failed')) },
           E('div', { key: 'tree', className: 'dws-card' }, [
             E('div', { key: 'head', className: 'dws-cardHead' }, [
@@ -685,6 +683,10 @@
             ]),
             ...(root === undefined ? [E('div', { key: 'empty', className: 'dws-empty' }, t('overview.tree.empty'))] : renderWorkspace(root, 0)),
           ])),
+        E(QuietBoundary, {
+          key: 'envBoundary',
+          fallback: () => E('div', { className: 'dws-card dws-empty' }, t('overview.failed')),
+        }, renderEnvCard()),
         // Only a README that actually read shows a card; otherwise the section is
         // absent rather than an empty frame.
         settings.readme === true && readme !== null ? E('div', { key: 'readme', className: 'dws-card' }, [
