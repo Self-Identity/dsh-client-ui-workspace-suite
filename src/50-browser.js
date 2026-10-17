@@ -312,7 +312,7 @@
           key: 'session:' + row.id,
           className: 'dws-sessionRow' + (row.id === currentSessionId ? ' dws-sessionRow--selected' : '')
             + (row.archived ? ' dws-sessionRow--archived' : ''),
-          style: { '--suite-indent': String(depth * 12) + 'px' },
+          style: { '--suite-indent': String(indentOf(depth)) + 'px' },
           role: 'treeitem',
           'aria-selected': row.id === currentSessionId ? 'true' : 'false',
           onClick: rowClick(
@@ -396,6 +396,16 @@
         })
       }
 
+      /**
+       * Leading indent of one tree level, in px, on top of the row's own 8px padding.
+       *
+       * Nested rows sit 15px further left than the plain `depth * 12` ladder would put
+       * them (the user asked for a quieter first level), keeping a 3px floor so the
+       * immediate child still reads as nested instead of sitting flush with its parent.
+       * Deeper levels keep their relative 12px steps and simply shift left with it.
+       */
+      const indentOf = (depth) => (depth <= 0 ? 0 : Math.max(3, depth * 12 - 15))
+
       const renderWorkspace = (workspace, depth) => {
         const children = tree.childrenOf.get(workspace.workspaceId) || []
         const expanded = isExpanded(workspace.workspaceId)
@@ -428,7 +438,7 @@
         const rowNode = E('div', {
           key: 'ws:' + workspace.workspaceId,
           className: 'dws-wsRow' + (currentSessionId !== undefined && (workspace.sessionIds || []).includes(currentSessionId) ? ' dws-wsRow--current' : ''),
-          style: { '--suite-indent': String(depth * 12) + 'px' },
+          style: { '--suite-indent': String(indentOf(depth)) + 'px' },
           role: 'treeitem',
           'aria-expanded': expanded ? 'true' : 'false',
           // No always-on chevron, so the row itself carries the keyboard
@@ -534,7 +544,7 @@
             rows.push(E('div', {
               key: 'more:' + workspace.workspaceId,
               className: 'dws-moreRow',
-              style: { '--suite-indent': String((depth + 1) * 12) + 'px' },
+              style: { '--suite-indent': String(indentOf(depth + 1)) + 'px' },
             }, E(TextButton, {
               onClick: () => setReveal(workspace.workspaceId, limit + REVEAL_STEP),
             }, t('browser.showMore') + ' (' + String(hiddenSessions) + ')')))
@@ -542,7 +552,7 @@
             rows.push(E('div', {
               key: 'less:' + workspace.workspaceId,
               className: 'dws-moreRow',
-              style: { '--suite-indent': String((depth + 1) * 12) + 'px' },
+              style: { '--suite-indent': String(indentOf(depth + 1)) + 'px' },
             }, E(TextButton, {
               onClick: () => setReveal(workspace.workspaceId, REVEAL_STEP),
             }, t('browser.showLess'))))

@@ -640,6 +640,23 @@ for (const { options, component } of registrations) {
     } else {
       console.log('  inline picker: add mode, no seed, chooser eligible')
     }
+    // The indent ladder: nested rows sit 15px further left than the plain 12px
+    // ladder (with a 3px floor), so the old first-level values must be gone.
+    const indents = budget.elements
+      .filter((entry) => entry.props !== null && typeof entry.props === 'object'
+        && entry.props.style !== null && typeof entry.props.style === 'object'
+        && typeof entry.props.style['--suite-indent'] === 'string')
+      .map((entry) => entry.props.style['--suite-indent'])
+    const px = indents.map((value) => parseFloat(value))
+    if (px.length === 0) fail('no rendered row carried an indent, so the ladder cannot be checked')
+    else if (!px.includes(0)) fail('no top-level row rendered without an indent: ' + JSON.stringify(indents))
+    else if (px.includes(12)) fail('a nested row still uses the old 12px first-level indent: ' + JSON.stringify(indents))
+    else if (px.some((value) => Number.isFinite(value) && value > 0 && value < 3)) {
+      fail('a nested row is indented below the 3px floor: ' + JSON.stringify(indents))
+    } else {
+      const nested = [...new Set(px.filter((value) => value > 0))].sort((left, right) => left - right)
+      console.log('  indent ladder: level 0 = 0px, nested = ' + nested.join('/') + 'px')
+    }
     const marks = budget.strings.filter((text) => text.startsWith('mark:'))
     if (marks.length === 0) fail('the row-leading ledger seat (schedule mark) was not rendered; ledger queries: ' + JSON.stringify(ledgerQueries))
     else console.log('  row-leading seats rendered: ' + marks.join(', '))
