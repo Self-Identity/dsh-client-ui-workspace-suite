@@ -41,10 +41,22 @@
       { persist: { name: 'dsh-workspace-suite.settings.v1' } },
     )
 
+    // Persisted settings from an older build lack the keys added since; write the
+    // defaults back once so the stored object and the card agree, and so a later
+    // reload does not depend on the merge alone.
+    settingsStore.update((draft) => {
+      for (const key of SETTINGS_KEYS) {
+        if (draft[key] === undefined) draft[key] = DEFAULT_SETTINGS[key]
+      }
+    })
+
     let settingsScope = null
 
-    /** Snapshot of the current settings, always a stable reference per revision. */
-    const settingsSnapshot = () => settingsStore.getSnapshot()
+    /**
+     * Snapshot of the current settings, always a stable reference per revision and
+     * always carrying every key (see {@link mergeSettings} for why that matters).
+     */
+    const settingsSnapshot = () => mergeSettings(DEFAULT_SETTINGS, settingsStore.getSnapshot())
 
     /** One settings hook for the whole object; slices are derived with useMemo. */
     const useSettings = () => React.useSyncExternalStore(settingsStore.subscribe, settingsSnapshot)

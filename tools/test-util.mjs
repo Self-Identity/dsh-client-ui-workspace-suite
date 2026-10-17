@@ -31,7 +31,7 @@ const names = [
   'sumBuckets', 'dayKey', 'relativeTime', 'errorMessage', 'timestamp',
   'usageViewOf', 'boundCall', 'USAGE_KEY',
   'directoryNames', 'packageSummary', 'enginesSummary', 'ENV_PROBE_FILES',
-  'selectionStep', 'isBoundaryPath', 'isSiblingPath', 'parentPathOf', 'scrollbarWidthOf',
+  'selectionStep', 'isBoundaryPath', 'isSiblingPath', 'parentPathOf', 'scrollbarWidthOf', 'mergeSettings',
 ]
 
 const preamble = [
@@ -64,8 +64,20 @@ const {
   collectSubtree, ancestorsOf, chainForPath, formatTokens, sumBuckets, dayKey, relativeTime,
   errorMessage, timestamp, usageViewOf, boundCall, USAGE_KEY,
   directoryNames, packageSummary, enginesSummary, ENV_PROBE_FILES,
-  selectionStep, isBoundaryPath, isSiblingPath, parentPathOf, scrollbarWidthOf,
+  selectionStep, isBoundaryPath, isSiblingPath, parentPathOf, scrollbarWidthOf, mergeSettings,
 } = exported
+
+/* ------------------------- settings default merge -------------------------- */
+
+// Settings persisted by an older build lack the keys added since; reading them
+// as-is made `moduleHeroMenu === true` false and silently turned the takeover off.
+check('settings merge: stored value wins', mergeSettings({ a: true, b: 2 }, { a: false }).a, false)
+check('settings merge: missing key keeps the default', mergeSettings({ a: true, b: 2 }, { a: false }).b, 2)
+check('settings merge: explicit undefined keeps the default', mergeSettings({ a: 1 }, { a: undefined }).a, 1)
+check('settings merge: unknown keys dropped',
+  Object.prototype.hasOwnProperty.call(mergeSettings({ a: 1 }, { a: 2, zz: 9 }), 'zz'), false)
+check('settings merge: null snapshot', mergeSettings({ a: 1 }, null).a, 1)
+check('settings merge: empty defaults', JSON.stringify(mergeSettings({}, { a: 1 })), '{}')
 
 /* ---------------------------- scrollbar width ----------------------------- */
 

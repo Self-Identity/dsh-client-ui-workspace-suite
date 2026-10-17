@@ -327,6 +327,26 @@
     const USAGE_KEY = 'workspaceSuiteUsage'
 
     /**
+     * Merge a stored settings snapshot onto the defaults.
+     *
+     * A stored object written by an older build simply does not carry keys added
+     * later (`moduleHeroMenu`, `showEnv`, `scrollbarWidth`, ...). Reading such a
+     * snapshot as-is leaves those keys `undefined`, and every `=== true` gate then
+     * silently turns the feature off — which is exactly how the conversation
+     * workspace menu reverted to the shipped one after the key was introduced.
+     * Only known keys are copied, and a stored `undefined` keeps the default.
+     */
+    function mergeSettings(defaults, snapshot) {
+      const source = snapshot !== null && typeof snapshot === 'object' ? snapshot : {}
+      const merged = {}
+      const keys = defaults !== null && typeof defaults === 'object' ? Object.keys(defaults) : []
+      for (const key of keys) {
+        merged[key] = source[key] === undefined ? defaults[key] : source[key]
+      }
+      return merged
+    }
+
+    /**
      * Width of this plugin's own scrollbars as a CSS length, clamped to the setting's
      * 4–20px range with an 8px default. The stylesheet falls back to the global
      * `--dsh-scrollbar-width` (the scrollbar-tuner plugin / theme) when this is unset.
