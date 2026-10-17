@@ -326,6 +326,95 @@
     /** The projection key this bundle's host half registers. */
     const USAGE_KEY = 'workspaceSuiteUsage'
 
+    /** A drive root (`C:/`) or the POSIX root: a boundary, never a fillable parent. */
+    function isBoundaryPath(path) {
+      const raw = typeof path === 'string' ? path.trim() : ''
+      if (raw === '/' || raw === '\\') return true
+      if (/^[a-z]:[\\/]*$/i.test(raw)) return true
+      // `normalizePath('C:/')` gives the bare `C:` form, so test both spellings.
+      const folded = normalizePath(raw)
+      return folded === '/' || /^[a-z]:$/i.test(folded)
+    }
+
+    /**
+     * The immediate parent directory of a path, folded, or '' when it has none.
+     *
+     * {@link parentPathsOf} drops the POSIX root from its chain, so `/a` would look
+     * parentless even though `/` is its parent — and two folders under the root then
+     * failed the sibling test and were rejected as "another tree".
+     */
+    function parentPathOf(path) {
+      const list = parentPathsOf(path)
+      if (list.length > 0) return foldPath(list[0])
+      const normalized = normalizePath(typeof path === 'string' ? path : '')
+      if (normalized.length > 1 && normalized.startsWith('/')) return '/'
+      return ''
+    }
+
+    /**
+     * Two paths directly under the same parent. This is the one relation besides
+     * ancestor/descendant that stays nestable: pulling in the shared parent makes the
+     * set a small tree instead of two unrelated roots.
+     */
+    function isSiblingPath(left, right) {
+      if (foldPath(left) === foldPath(right)) return false
+      const parent = parentPathOf(left)
+      return parent !== '' && parent === parentPathOf(right)
+    }
+
+    /**
+     * One selection step, as a **pure function** of the current selection.
+     *
+     * The component keeps its selection in a Map keyed by {@link foldPath}; this takes
+     * and returns `{ path, remark }` entries so the four rules the user asked for can be
+     * tested without a renderer:
+     *
+     *  1. picking an already selected folder removes it **together with everything
+     *     under it** (a selection never keeps an orphaned child);
+     *  2. picking a folder that is neither an ancestor, a descendant **nor a sibling**
+     *     of any pick is a conflict (the dialog asks before replacing the tree);
+     *  3. otherwise the pick is added and the chain up to the nearest already selected
+     *     ancestor is filled in, so nothing lands as an orphan next to its own parent;
+     *  4. a **sibling** pick pulls in their common parent — but never a drive/root
+     *     boundary, which would silently select an entire disk just because two folders
+     *     on it were chosen.
+     *
+     * Returns `{ action: 'remove', keys }`, `{ action: 'conflict' }` or
+     * `{ action: 'add', paths }` (ancestors first, the pick last).
+     */
+    function selectionStep(entries, path) {
+      const list = (Array.isArray(entries) ? entries : [])
+        .filter((entry) => entry !== null && typeof entry === 'object' && typeof entry.path === 'string')
+      const key = foldPath(path)
+      if (list.some((entry) => foldPath(entry.path) === key)) {
+        return {
+          action: 'remove',
+          keys: list
+            .filter((entry) => foldPath(entry.path) === key || isAncestorPath(path, entry.path))
+            .map((entry) => foldPath(entry.path)),
+        }
+      }
+      // Siblings belong to the same tree: the common parent gets pulled in below, so
+      // they must NOT be reported as "another tree" (that prompt cleared the earlier
+      // picks, which is what made the constraints look chaotic).
+      const related = list.some((entry) => isAncestorPath(entry.path, path)
+        || isAncestorPath(path, entry.path)
+        || isSiblingPath(entry.path, path))
+      if (list.length > 0 && !related) return { action: 'conflict' }
+      const parents = parentPathsOf(path)
+      const hasSibling = list.some((entry) => isSiblingPath(entry.path, path))
+      const selectedAncestorIndex = parents.findIndex((parent) => list.some((entry) => foldPath(entry.path) === foldPath(parent)))
+      const stopIndex = selectedAncestorIndex === -1 ? -1 : selectedAncestorIndex - 1
+      // Rule 4 must not reach a boundary: `C:/x` plus `C:/y` would otherwise pull the
+      // whole `C:/` drive into the selection as a workspace.
+      const siblingTop = hasSibling && parents.length > 0 && !isBoundaryPath(parents[0]) ? 0 : -1
+      const fillTop = Math.max(stopIndex, siblingTop)
+      const paths = []
+      for (let index = 0; index <= fillTop; index += 1) paths.push(parents[index])
+      paths.push(path)
+      return { action: 'add', paths }
+    }
+
     /**
      * The top-level files the environment card probes by **reading** them. The
      * directory seam cannot help here: the browse backend's `list` filters every

@@ -366,66 +366,49 @@
       const rootKey = '::root::'
       const isSelected = (path) => selected.has(foldPath(path))
 
-      /**
-       * Add one folder plus whatever intermediate ancestors keep the set nestable:
-       *  - the whole chain between the new folder and the nearest **already selected**
-       *    ancestor, so a deep pick never lands as an orphan next to its own parent;
-       *  - the common parent when the new folder is a **sibling** of an existing pick
-       *    (the rule the user asked for), even when nothing above is selected yet.
-       * A first pick with nothing around it adds only itself.
-       */
-      const addSelection = (path, remark) => {
-        setSelected((previous) => {
-          const next = new Map(previous)
-          const parents = parentPathsOf(path)
-          const parentKey = parents.length === 0 ? '' : foldPath(parents[0])
-          const hasSibling = [...previous.values()].some((entry) => foldPath(entry.path) !== foldPath(path)
-            && parentKey !== '' && parentPathsOf(entry.path).length > 0
-            && foldPath(parentPathsOf(entry.path)[0]) === parentKey)
-          const selectedAncestorIndex = parents.findIndex((parent) => next.has(foldPath(parent)))
-          const stopIndex = selectedAncestorIndex === -1 ? -1 : selectedAncestorIndex - 1
-          const fillTop = Math.max(stopIndex, hasSibling ? 0 : -1)
-          for (let index = 0; index <= fillTop; index += 1) {
-            const parent = parents[index]
-            const parentPathKey = foldPath(parent)
-            if (!next.has(parentPathKey)) next.set(parentPathKey, { path: parent, remark: remarkFor(parent) })
-          }
-          const key = foldPath(path)
-          if (!next.has(key)) next.set(key, { path, remark: remark === undefined ? remarkFor(path) : remark })
-          return next
-        })
-      }
+      /** The selection in the plain shape the pure rule function takes. */
+      const selectionList = () => [...selectedRef.current.values()]
 
-      const toggleSelect = (path, remark) => {
-        const key = foldPath(path)
-        // Read the latest committed selection, not the map this render closed over:
-        // the typed-path and system-dialog entries call this from a promise callback.
-        const current = selectedRef.current
-        if (current.has(key)) {
-          // Unchecking a parent unchecks everything selected beneath it in the same
-          // click, so a selection can never keep an orphaned child without its parent.
+      /**
+       * Apply one selection step. {@link selectionStep} owns the rules (remove the
+       * subtree, refuse an unrelated tree, fill the ancestor chain, pull in a sibling's
+       * common parent but never a drive boundary); this only turns its answer into
+       * state. `options.replace` is for the conflict dialog's "clear and select it",
+       * which must be judged against an empty selection instead of the one it replaces.
+       */
+      const applySelection = (path, remark, options) => {
+        const replacing = options !== undefined && options.replace === true
+        const step = selectionStep(replacing ? [] : selectionList(), path)
+        if (step.action === 'conflict') {
+          setConflict({ path, remark })
+          return
+        }
+        if (step.action === 'remove') {
           setSelected((previous) => {
-            const next = new Map()
-            for (const [entryKey, value] of previous) {
-              if (entryKey === key || isAncestorPath(path, value.path)) continue
-              next.set(entryKey, value)
-            }
+            const next = new Map(previous)
+            for (const key of step.keys) next.delete(key)
             return next
           })
           return
         }
-        // A pick that is neither an ancestor nor a descendant of *any* current pick
-        // starts a different tree, so ask before replacing the existing selection.
-        const related = [...current.values()].some((entry) => isAncestorPath(entry.path, path)
-          || isAncestorPath(path, entry.path))
-        if (current.size > 0 && !related) {
-          setConflict({ path, remark })
-          return
-        }
-        addSelection(path, remark)
+        setSelected((previous) => {
+          const next = new Map(previous)
+          for (const filled of step.paths) {
+            const key = foldPath(filled)
+            if (next.has(key)) continue
+            const isPick = key === foldPath(path)
+            next.set(key, {
+              path: filled,
+              remark: isPick ? (remark === undefined ? remarkFor(filled) : remark) : remarkFor(filled),
+            })
+          }
+          return next
+        })
         // Checking a folder opens it, so its children are immediately pickable.
         setOpen(path, true)
       }
+
+      const toggleSelect = (path, remark) => applySelection(path, remark)
 
       /** Remark already stored for a registered workspace with this path. */
       const remarkFor = (path) => {
@@ -1041,8 +1024,9 @@
                 setConflict(null)
                 if (pending !== null) {
                   // Replace: drop everything, then add the new pick (with its chain).
+                  // Judged against the empty selection, or the conflict would repeat.
                   setSelected(new Map())
-                  addSelection(pending.path, pending.remark)
+                  applySelection(pending.path, pending.remark, { replace: true })
                 }
               },
             }, t('picker.conflict.replace')),

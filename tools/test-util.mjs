@@ -31,6 +31,7 @@ const names = [
   'sumBuckets', 'dayKey', 'relativeTime', 'errorMessage', 'timestamp',
   'usageViewOf', 'boundCall', 'USAGE_KEY',
   'directoryNames', 'packageSummary', 'enginesSummary', 'ENV_PROBE_FILES',
+  'selectionStep', 'isBoundaryPath', 'isSiblingPath', 'parentPathOf',
 ]
 
 const preamble = [
@@ -63,7 +64,44 @@ const {
   collectSubtree, ancestorsOf, chainForPath, formatTokens, sumBuckets, dayKey, relativeTime,
   errorMessage, timestamp, usageViewOf, boundCall, USAGE_KEY,
   directoryNames, packageSummary, enginesSummary, ENV_PROBE_FILES,
+  selectionStep, isBoundaryPath, isSiblingPath, parentPathOf,
 } = exported
+
+/* ---------------------- picker selection constraints ---------------------- */
+
+// The four rules the user asked for, as a pure state machine: an orphan next to
+// its own parent, a silently replaced tree, or a drive root pulled in as a
+// workspace all read to the user as "the selection constraints went chaotic".
+const pick = (entries, path) => selectionStep(entries.map((value) => ({ path: value })), path)
+const pathsOf = (step) => (step.paths === undefined ? step.action : step.paths.join('|'))
+
+check('boundary: drive root', isBoundaryPath('C:\\'), true)
+check('boundary: posix root', isBoundaryPath('/'), true)
+check('boundary: ordinary folder', isBoundaryPath('C:/a'), false)
+check('parentPathOf: drive child', parentPathOf('C:\\x'), 'c:')
+check('parentPathOf: posix child', parentPathOf('/x'), '/')
+check('parentPathOf: drive root', parentPathOf('C:\\'), '')
+check('siblings: same drive', isSiblingPath('C:/x', 'C:/y'), true)
+check('siblings: posix root children', isSiblingPath('/a', '/b'), true)
+check('siblings: drive roots are not siblings', isSiblingPath('C:/', 'D:/'), false)
+check('siblings: different trees', isSiblingPath('F:/p/one', 'F:/q/two'), false)
+
+check('rule 1: a first pick adds only itself', pathsOf(pick([], 'C:/a/b')), 'C:/a/b')
+check('rule 1: unchecking removes the subtree', JSON.stringify(pick(['C:/a', 'C:/a/b', 'C:/a/b/c'], 'C:/a/b')),
+  JSON.stringify({ action: 'remove', keys: ['c:/a/b', 'c:/a/b/c'] }))
+check('rule 1: unchecking leaves the rest alone',
+  JSON.stringify(pick(['C:/a', 'C:/a/b', 'C:/d'], 'C:/a/b').keys), JSON.stringify(['c:/a/b']))
+check('rule 2: an unrelated pick conflicts', pick(['C:/a'], 'D:/x').action, 'conflict')
+check('rule 2: a descendant is not a conflict', pathsOf(pick(['C:/a'], 'C:/a/b')), 'C:/a/b')
+check('rule 2: an ancestor is not a conflict', pathsOf(pick(['C:/a'], 'C:/')), 'C:/')
+check('rule 3: fills the gap to the selected ancestor', pathsOf(pick(['C:/a'], 'C:/a/b/c')), 'C:/a/b|C:/a/b/c')
+check('rule 3: adds nothing when the parent chain is solid', pathsOf(pick(['C:/a', 'C:/a/b'], 'C:/a/b/c')), 'C:/a/b/c')
+check('rule 4: a sibling pulls in the common parent', pathsOf(pick(['C:/a/x'], 'C:/a/y')), 'C:/a|C:/a/y')
+check('rule 4: posix siblings too', pathsOf(pick(['/home/u/a'], '/home/u/b')), '/home/u|/home/u/b')
+check('rule 4: never pulls in a drive boundary', pathsOf(pick(['C:/x'], 'C:/y')), 'C:/y')
+check('rule 4: never pulls in the posix root', pathsOf(pick(['/a'], '/b')), '/b')
+check('rule 4: a different tree on the same drive still conflicts',
+  pick(['F:/p/one'], 'F:/q/two').action, 'conflict')
 
 /* --------------------------- dependencies card ---------------------------- */
 
