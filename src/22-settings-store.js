@@ -53,10 +53,23 @@
     let settingsScope = null
 
     /**
-     * Snapshot of the current settings, always a stable reference per revision and
-     * always carrying every key (see {@link mergeSettings} for why that matters).
+     * Snapshot of the current settings: always carrying every key (see
+     * {@link mergeSettings}) **and** always the same reference for one store revision.
+     *
+     * `useSyncExternalStore` compares snapshots by identity; returning a freshly
+     * merged object on every read makes React believe the store changes on every
+     * render, and the component that reads it (the sidebar workspace list) fails to
+     * render at all. So the merged object is cached against the raw snapshot.
      */
-    const settingsSnapshot = () => mergeSettings(DEFAULT_SETTINGS, settingsStore.getSnapshot())
+    let cachedRaw = null
+    let cachedMerged = null
+    const settingsSnapshot = () => {
+      const raw = settingsStore.getSnapshot()
+      if (raw === cachedRaw && cachedMerged !== null) return cachedMerged
+      cachedRaw = raw
+      cachedMerged = mergeSettings(DEFAULT_SETTINGS, raw)
+      return cachedMerged
+    }
 
     /** One settings hook for the whole object; slices are derived with useMemo. */
     const useSettings = () => React.useSyncExternalStore(settingsStore.subscribe, settingsSnapshot)

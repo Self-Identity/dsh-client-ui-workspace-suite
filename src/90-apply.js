@@ -354,12 +354,26 @@
 
       /** Take over the sidebar workspace list below every shipped entry's priority. */
       const registerBrowser = () => {
+        // Its own boundary as well: a render error inside the list must leave the
+        // sidebar usable (an empty area with a readable notice) instead of blanking the
+        // whole panel, and the message lands in the boot record.
+        const guarded = (props) => E(QuietBoundary, {
+          onError: (error) => reportBoot('sidebar-failed', String(error === null || error === undefined
+            ? 'unknown'
+            : (error.message === undefined ? error : error.message))),
+          fallback: (message) => {
+            const translate = typeof props.t === 'function' ? props.t : (key) => key
+            return E('div', { className: 'dws-root' },
+              E('div', { className: 'dws-empty', style: { padding: '12px', overflowWrap: 'anywhere' } },
+                translate('browser.renderFailed') + ' ' + String(message === null || message === undefined ? '' : message)))
+          },
+        }, E(SuiteWorkspaceBrowser, props))
         registerIn('sidebar.workspaces', {
           name: 'sidebar.workspaces',
           priority: -100,
           locale: NS,
           inject: () => ({ services }),
-        }, SuiteWorkspaceBrowser)
+        }, guarded)
       }
 
       /**

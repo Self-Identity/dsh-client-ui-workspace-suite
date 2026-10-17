@@ -89,7 +89,17 @@ function fakeReact() {
     useLayoutEffect() {},
     useSyncExternalStore(_subscribe, getSnapshot) {
       HOOK_GUARD.calls += 1
-      return getSnapshot()
+      // React compares snapshots by identity: a getSnapshot that builds a new object
+      // on every read makes it believe the store changed on every render, and the
+      // component that reads it stops rendering (this is how the sidebar list once
+      // blanked after the settings snapshot started being merged on read).
+      const first = getSnapshot()
+      const second = getSnapshot()
+      if (first !== second) {
+        fail('useSyncExternalStore returned a new snapshot for the same revision; '
+          + 'React would loop and the reading component would vanish')
+      }
+      return first
     },
     useContext() {
       return {}
