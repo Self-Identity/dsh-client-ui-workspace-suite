@@ -1,0 +1,15 @@
+# Build artefacts: lib/ is committed on purpose (the client loads it as-is).
+node_modules/
+*.log
+*.tmp
+.build-stamp
+
+# Editors and OS shells
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ACL recovery records from the Windows sandbox repair
+.acl-recovery/

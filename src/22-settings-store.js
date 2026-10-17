@@ -5,6 +5,8 @@
       modulePicker: true,
       moduleTree: true,
       moduleOverview: true,
+      // The conversation window's workspace menu (root-level list + subtree chooser).
+      moduleHeroMenu: true,
       // 100 = the list fills the space down to the account row (shipped behavior);
       // lower values cap how far it grows before it scrolls inside itself.
       treeMaxHeightPct: 100,

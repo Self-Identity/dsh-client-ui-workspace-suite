@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Workspace suite",
-    "description": "Explorer-style workspace picker, nested workspace tree with collapse-all, and a per-workspace overview page with token usage and README rendering."
+    "description": "Explorer-style workspace picker, nested workspace tree, workspace overview page and the conversation workspace menu."
   }
 }

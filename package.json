@@ -1,7 +1,7 @@
 {
   "name": "dsh-client-ui-workspace-suite",
-  "version": "1.0.0",
-  "description": "Workspace suite for the DSH Web client: an explorer-style folder picker, a nested workspace tree list with collapse-all, and a per-workspace overview panel with token usage, turn jumps and README rendering.",
+  "version": "1.1.0",
+  "description": "Workspace suite for the DSH Web client: an explorer-style picker (browse, inline folder creation, path input, enter-which-workspace chooser), a nested workspace tree with collapse-all and cascade delete, a per-workspace overview page (subtree token totals, expanded session tree, turn jumps, dependencies card, README), and a root-level conversation workspace menu.",
   "license": "MIT",
   "private": true,
   "type": "module",
@@ -24,7 +24,9 @@
     "locale",
     "cordis.patch.yml",
     "icon.svg",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "node tools/build.mjs",

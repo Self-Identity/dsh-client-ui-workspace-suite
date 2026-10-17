@@ -451,9 +451,9 @@
         if (settings.modulePicker === true) registerPicker()
         if (settings.moduleTree === true) registerBrowser()
         if (settings.moduleOverview === true) registerOverview()
-        // Tied to the picker module: the hero menu only makes sense together with the
-        // add-workspace flow it opens.
-        if (settings.modulePicker === true) registerHeroPicker()
+        // Its own switch: taking over the conversation window's workspace menu is a
+        // visible change users may want to undo without giving up the picker.
+        if (settings.moduleHeroMenu === true) registerHeroPicker()
         registerSettings()
         lastSignature = signature
       }
