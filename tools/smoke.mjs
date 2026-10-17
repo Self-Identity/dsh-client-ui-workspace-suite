@@ -667,23 +667,24 @@ for (const { options, component } of registrations) {
     } else {
       console.log('  scrollbar width: 8px default on the plugin root')
     }
-    // The indent ladder: nested rows sit 15px further left than the plain 12px
-    // ladder (with a 3px floor), so the old first-level values must be gone.
+    // Two ladders share the same CSS variable: workspace rows add a fixed extra per
+    // nested level (child folder icon/title 27px further right), session rows keep
+    // the plain ladder. With the fixture that means a child workspace at 30px and a
+    // session under a root workspace at 3px.
     const indents = budget.elements
       .filter((entry) => entry.props !== null && typeof entry.props === 'object'
-        && entry.props.style !== null && typeof entry.props.style === 'object'
+        && (entry.props.style !== null && typeof entry.props.style === 'object')
         && typeof entry.props.style['--suite-indent'] === 'string')
-      .map((entry) => entry.props.style['--suite-indent'])
-    const px = indents.map((value) => parseFloat(value))
-    if (px.length === 0) fail('no rendered row carried an indent, so the ladder cannot be checked')
-    else if (!px.includes(0)) fail('no top-level row rendered without an indent: ' + JSON.stringify(indents))
-    else if (px.includes(12)) fail('a nested row still uses the old 12px first-level indent: ' + JSON.stringify(indents))
-    else if (px.some((value) => Number.isFinite(value) && value > 0 && value < 3)) {
-      fail('a nested row is indented below the 3px floor: ' + JSON.stringify(indents))
-    } else {
-      const nested = [...new Set(px.filter((value) => value > 0))].sort((left, right) => left - right)
-      console.log('  indent ladder: level 0 = 0px, nested = ' + nested.join('/') + 'px')
-    }
+      .map((entry) => parseFloat(entry.props.style['--suite-indent']))
+    const unique = [...new Set(indents.filter((value) => Number.isFinite(value)))].sort((left, right) => left - right)
+    if (indents.length === 0) fail('no rendered row carried an indent, so the ladders cannot be checked')
+    else if (!unique.includes(0)) fail('no top-level row rendered without an indent: ' + JSON.stringify(unique))
+    else if (unique.includes(12)) fail('a row still uses the old 12px first-level indent: ' + JSON.stringify(unique))
+    else if (!unique.includes(30)) {
+      fail('a child workspace row does not carry the 27px extra (expected 30px): ' + JSON.stringify(unique))
+    } else if (!unique.includes(3)) fail('a session under a root workspace lost its 3px indent: ' + JSON.stringify(unique))
+    else if (unique.some((value) => value > 0 && value < 3)) fail('a nested row is below the 3px floor: ' + JSON.stringify(unique))
+    else console.log('  indent ladders: workspace child = 30px+, session nested = ' + unique.filter((value) => value < 27).join('/') + 'px')
     const marks = budget.strings.filter((text) => text.startsWith('mark:'))
     if (marks.length === 0) fail('the row-leading ledger seat (schedule mark) was not rendered; ledger queries: ' + JSON.stringify(ledgerQueries))
     else console.log('  row-leading seats rendered: ' + marks.join(', '))

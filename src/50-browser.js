@@ -434,8 +434,18 @@
        * them (the user asked for a quieter first level), keeping a 3px floor so the
        * immediate child still reads as nested instead of sitting flush with its parent.
        * Deeper levels keep their relative 12px steps and simply shift left with it.
+       *
+       * Session rows (and the turn rows under them) use this ladder unchanged.
        */
       const indentOf = (depth) => (depth <= 0 ? 0 : Math.max(3, depth * 12 - 15))
+
+      /**
+       * Leading indent of a **workspace** row: the same ladder plus a fixed extra for
+       * every nested level, so the child workspace (its folder icon and title) sits
+       * clearly right of its parent while the sessions keep their place.
+       */
+      const WORKSPACE_NESTED_EXTRA = 27
+      const workspaceIndentOf = (depth) => (depth <= 0 ? 0 : indentOf(depth) + WORKSPACE_NESTED_EXTRA)
 
       const renderWorkspace = (workspace, depth) => {
         const children = tree.childrenOf.get(workspace.workspaceId) || []
@@ -469,7 +479,7 @@
         const rowNode = E('div', {
           key: 'ws:' + workspace.workspaceId,
           className: 'dws-wsRow' + (currentSessionId !== undefined && (workspace.sessionIds || []).includes(currentSessionId) ? ' dws-wsRow--current' : ''),
-          style: { '--suite-indent': String(indentOf(depth)) + 'px' },
+          style: { '--suite-indent': String(workspaceIndentOf(depth)) + 'px' },
           role: 'treeitem',
           'aria-expanded': expanded ? 'true' : 'false',
           // No always-on chevron, so the row itself carries the keyboard
