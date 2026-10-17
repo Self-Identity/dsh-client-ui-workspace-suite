@@ -700,7 +700,7 @@
           archiveMenu(16),
           E(IconButton, {
             key: 'collapse',
-            label: anyCollapsed ? t('browser.collapseAll') : t('browser.expandAll'),
+            label: anyCollapsed ? t('browser.expandAll') : t('browser.collapseAll'),
             iconName: 'IconWorkspaceTreeOutlineRegular',
             size: 16,
             pressed: anyCollapsed,
@@ -728,7 +728,7 @@
           archiveMenu(18),
           E(IconButton, {
             key: 'collapse',
-            label: anyCollapsed ? t('browser.collapseAll') : t('browser.expandAll'),
+            label: anyCollapsed ? t('browser.expandAll') : t('browser.collapseAll'),
             iconName: 'IconWorkspaceTreeOutlineRegular',
             size: 18,
             pressed: anyCollapsed,

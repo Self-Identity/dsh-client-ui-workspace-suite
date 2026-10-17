@@ -667,6 +667,22 @@ for (const { options, component } of registrations) {
     } else {
       console.log('  scrollbar width: 8px default on the plugin root')
     }
+    // The tree toggle's tooltip must describe the action it will take: when some row is
+    // collapsed the click expands everything, otherwise it collapses everything. The
+    // two labels were once swapped, so the button did the opposite of its tooltip.
+    const treeToggle = budget.elements.find((entry) => entry.props !== null && typeof entry.props === 'object'
+      && entry.props.iconName === 'IconWorkspaceTreeOutlineRegular')
+    if (treeToggle === undefined) {
+      fail('the workspace header has no expand/collapse-all control')
+    } else {
+      const expectedLabel = treeToggle.props.pressed === true ? 'browser.expandAll' : 'browser.collapseAll'
+      if (treeToggle.props.label !== expectedLabel) {
+        fail('the expand/collapse toggle is labelled ' + String(treeToggle.props.label)
+          + ' but would ' + (treeToggle.props.pressed === true ? 'expand' : 'collapse') + ' every row')
+      } else {
+        console.log('  tree toggle: label matches its action (' + expectedLabel + ')')
+      }
+    }
     // Three offsets share one CSS variable and every one of them is a multiple of the
     // 22px workspace lead unit: workspace rows step 22 per level (child icon starts
     // where the parent's title text starts), sessions sit +3 from their own workspace,
