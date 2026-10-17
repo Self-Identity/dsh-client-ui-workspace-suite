@@ -346,7 +346,7 @@
           key: 'session:' + row.id,
           className: 'dws-sessionRow' + (row.id === currentSessionId ? ' dws-sessionRow--selected' : '')
             + (row.archived ? ' dws-sessionRow--archived' : ''),
-          style: { '--suite-indent': String(indentOf(depth)) + 'px' },
+          style: { '--suite-indent': String(sessionIndentOf(depth)) + 'px' },
           role: 'treeitem',
           'aria-selected': row.id === currentSessionId ? 'true' : 'false',
           onClick: rowClick(
@@ -428,18 +428,6 @@
       }
 
       /**
-       * Leading indent of one tree level, in px, on top of the row's own 8px padding.
-       *
-       * Nested rows sit 15px further left than the plain `depth * 12` ladder would put
-       * them (the user asked for a quieter first level), keeping a 3px floor so the
-       * immediate child still reads as nested instead of sitting flush with its parent.
-       * Deeper levels keep their relative 12px steps and simply shift left with it.
-       *
-       * Session rows (and the turn rows under them) use this ladder unchanged.
-       */
-      const indentOf = (depth) => (depth <= 0 ? 0 : Math.max(3, depth * 12 - 15))
-
-      /**
        * Leading indent of a **workspace** row.
        *
        * Every nested level adds exactly one row "lead unit": the folder icon's width
@@ -447,10 +435,24 @@
        * precisely where its parent's title text starts (8px row padding + 16 + 6 = 30px
        * from the row's left edge), which is the alignment the user asked for — instead
        * of the previous flat ladder that only nudged the child a few pixels right.
-       * Session rows (and the turn rows under them) keep `indentOf` untouched.
        */
       const WORKSPACE_LEVEL_STEP = 22
       const workspaceIndentOf = (depth) => (depth <= 0 ? 0 : depth * WORKSPACE_LEVEL_STEP)
+
+      /**
+       * Leading indent of a **session** row: its own workspace's indent plus a small
+       * step, so a session always sits just right of the workspace row it belongs to.
+       *
+       * A shared ladder only worked for the first level: from the second level on a
+       * child workspace moved to 30/52/74px while its sessions stayed at 3/9/21px, so
+       * the sessions rendered to the *left* of their own workspace. `sessionDepth` is
+       * the workspace depth + 1 (the caller's convention); SESSION_INDENT_STEP keeps
+       * the root-level sessions exactly where they were (8 + 3 = 11px).
+       */
+      const SESSION_INDENT_STEP = 3
+      const TURN_INDENT_STEP = 6
+      const sessionIndentOf = (sessionDepth) => workspaceIndentOf(sessionDepth <= 0 ? 0 : sessionDepth - 1) + SESSION_INDENT_STEP
+      const turnIndentOf = (sessionDepth) => sessionIndentOf(sessionDepth) + TURN_INDENT_STEP
 
       const renderWorkspace = (workspace, depth) => {
         const children = tree.childrenOf.get(workspace.workspaceId) || []
@@ -588,7 +590,7 @@
             rows.push(E('div', {
               key: 'more:' + workspace.workspaceId,
               className: 'dws-moreRow',
-              style: { '--suite-indent': String(indentOf(depth + 1)) + 'px' },
+              style: { '--suite-indent': String(turnIndentOf(depth)) + 'px' },
             }, E(TextButton, {
               onClick: () => setReveal(workspace.workspaceId, limit + REVEAL_STEP),
             }, t('browser.showMore') + ' (' + String(hiddenSessions) + ')')))
@@ -596,7 +598,7 @@
             rows.push(E('div', {
               key: 'less:' + workspace.workspaceId,
               className: 'dws-moreRow',
-              style: { '--suite-indent': String(indentOf(depth + 1)) + 'px' },
+              style: { '--suite-indent': String(turnIndentOf(depth)) + 'px' },
             }, E(TextButton, {
               onClick: () => setReveal(workspace.workspaceId, REVEAL_STEP),
             }, t('browser.showLess'))))
