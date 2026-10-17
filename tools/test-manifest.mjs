@@ -193,6 +193,23 @@ for (const locale of ['en', 'zh']) {
   console.log('hook placement: ' + String(hookOwning.size) + ' hook-owning component(s) checked')
 }
 
+/* --------------------- the add flow keeps its chooser -------------------- */
+
+/*
+ * The picker withholds the "which workspace do you enter" chooser from selection
+ * mode only. Keying that decision off `ownCreate` instead of the explicit `mode`
+ * silently removed the chooser for the sidebar's own add button, whose dialog
+ * instance always passes ownCreate.
+ */
+{
+  const pickerText = readFileSync(join(root, 'src', '40-picker.js'), 'utf8')
+  const declared = /const isAddFlow = (.+)/.exec(pickerText)
+  if (declared === null) fail('the picker no longer declares isAddFlow')
+  else if (!/mode === 'add'/.test(declared[1])) {
+    fail('isAddFlow must follow the explicit mode; keying it off ownCreate hides the entry chooser for the sidebar add button')
+  }
+}
+
 /* --------------------------------- files --------------------------------- */
 
 for (const relative of ['lib/index.js', 'lib/client.js', 'README.md', 'cordis.patch.yml']) {

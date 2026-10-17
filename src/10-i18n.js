@@ -45,6 +45,7 @@
       'picker.entry.body': '以下是刚刚确认的工作区结构，选一个开始会话（也可以直接跳过）。',
       'picker.entry.enter': '进入',
       'picker.entry.skip': '跳过',
+      'picker.entry.missing': '找不到该工作区（{path}），可能还没注册完成，请在工作区列表里重试。',
       'picker.subtree.body': '“{name}”下还有子工作区，请选择用哪一个开始本次会话。',
 
       'browser.title': '工作区',
@@ -219,6 +220,7 @@
       'picker.entry.body': 'These are the workspaces you just confirmed. Pick one to start a session, or skip.',
       'picker.entry.enter': 'Enter',
       'picker.entry.skip': 'Skip',
+      'picker.entry.missing': 'That workspace ({path}) is not registered yet; try again from the workspace list.',
       'picker.subtree.body': '"{name}" has sub-workspaces below it; pick the one this conversation should start in.',
 
       'browser.title': 'Workspaces',

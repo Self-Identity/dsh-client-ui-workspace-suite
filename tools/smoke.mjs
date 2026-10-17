@@ -626,6 +626,20 @@ for (const { options, component } of registrations) {
     }
   }
   if (options.name === 'sidebar.workspaces') {
+    // The inline picker instance must open in the right flow: the sidebar's add
+    // button is an *add* flow (blank start + the post-submit entry chooser), and
+    // only the row menu's "workspace selection" mirrors the current workspaces.
+    const inlinePicker = budget.elements.find((entry) => entry.props !== null && typeof entry.props === 'object'
+      && typeof entry.props.ownCreate === 'function')
+    if (inlinePicker === undefined) fail('the workspace browser never rendered its picker dialog')
+    else if (inlinePicker.props.mode !== 'add') {
+      fail('the inline picker did not open in add mode (got ' + String(inlinePicker.props.mode)
+        + '); its entry chooser would never appear')
+    } else if (inlinePicker.props.initialPaths !== undefined) {
+      fail('the inline picker seeded the current workspaces in add mode')
+    } else {
+      console.log('  inline picker: add mode, no seed, chooser eligible')
+    }
     const marks = budget.strings.filter((text) => text.startsWith('mark:'))
     if (marks.length === 0) fail('the row-leading ledger seat (schedule mark) was not rendered; ledger queries: ' + JSON.stringify(ledgerQueries))
     else console.log('  row-leading seats rendered: ' + marks.join(', '))
