@@ -256,11 +256,15 @@
       'overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
 
       /* ---- overview page ---- */
-      '.dws-page{box-sizing:border-box;height:100%;min-height:0;min-width:0;display:flex;flex-direction:column;',
-      // The page owns its scrolling: without this the host pane could scroll the whole
-      // page and the visible scrollbar would be the host's (a different width from the
-      // workspace list's).
-      'overflow:hidden;color:var(--dsw-alias-label-primary)}',
+      // `flex:1 1 auto` together with `height:100%`: the slot wrapper may be a flex
+      // column with an auto basis (where `height:100%` resolves to auto) or a plain
+      // block with a definite height (where flex does nothing). Without the flex half
+      // the page grew past the pane, the pane scrolled, and the visible scrollbar was
+      // the host's instead of this page's - i.e. a different width from the list's.
+      // `overflow:hidden` then keeps the pane from scrolling at all, so the scrollbar
+      // the user sees is always this page's own (same `--suite-scrollbar-width`).
+      '.dws-page{box-sizing:border-box;flex:1 1 auto;height:100%;min-height:0;min-width:0;',
+      'display:flex;flex-direction:column;overflow:hidden;color:var(--dsw-alias-label-primary)}',
       '.dws-pageHeader{flex:none;display:flex;align-items:flex-start;gap:12px;padding:28px clamp(24px,4vw,48px) 12px;min-width:0}',
       // On macOS the frame mounts the leading seat over every main panel, so the
       // heading pads below it exactly like the shipped entry pages do.
@@ -269,7 +273,7 @@
       '.dws-pageTitleRow{display:flex;align-items:center;gap:8px;min-width:0}',
       '.dws-pageTitle{margin:0;font-size:18px;font-weight:510;line-height:26px;overflow-wrap:anywhere}',
       '.dws-pagePath{font-size:12px;line-height:18px;overflow-wrap:anywhere}',
-      '.dws-pageBody{flex:1 1 auto;min-height:0;min-width:0;overflow-y:auto;display:block}',
+      '.dws-pageBody{flex:1 1 auto;min-height:0;min-width:0;overflow-y:auto;display:block;overscroll-behavior:contain}',
       '.dws-pageInner{box-sizing:border-box;width:100%;max-width:960px;margin:0 auto;',
       'padding:0 clamp(24px,4vw,48px) 48px;display:flex;flex-direction:column;gap:18px;min-width:0}',
       '.dws-card{box-sizing:border-box;display:flex;flex-direction:column;gap:10px;padding:14px 16px;min-width:0;',
@@ -307,7 +311,7 @@
       // ---- rendered README (the plugin's own markdown renderer) ----
       // GitHub-ish rhythm with theme tokens: headings above their text, code in a
       // layer-2 box, tables with hairline borders, links in the business colour.
-      '.dws-md{display:block;min-width:0}',
+      '.dws-md{display:block;min-width:0;padding-bottom:14px}',
       '.dws-md>:first-child{margin-top:0}',
       '.dws-md>:last-child{margin-bottom:0}',
       '.dws-mdPara{margin:0 0 10px;white-space:pre-wrap}',
