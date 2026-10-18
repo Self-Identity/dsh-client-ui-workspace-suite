@@ -802,10 +802,14 @@
         const rows = []
         for (const root of tree.roots) rows.push(...renderWorkspace(root, 0))
         if (ungrouped.length > 0) {
-          rows.push(E('div', { key: 'ungrouped', className: 'dws-wsRow', role: 'treeitem' }, [
-            E('span', { key: 'chev', className: 'dws-chev' }),
-            E('span', { key: 'folder', className: 'dws-folderIcon' }, icon('IconFolderCloseRegular', 16)),
-            E('span', { key: 'title', className: 'dws-title dws-title--workspace' }, t('browser.ungrouped')),
+          // A separate section, not a fake workspace row: a hairline divider plus a small
+          // caption reads as "the rest of the list", while a folder row would look
+          // clickable (it never was) and a coloured line would clash with the theme's
+          // blue-means-selected language.
+          rows.push(E('div', { key: 'ungroupedDivider', className: 'dws-sectionDivider', role: 'separator' }))
+          rows.push(E('div', { key: 'ungrouped', className: 'dws-sectionTitle' }, [
+            E('span', { key: 'title' }, t('browser.ungrouped')),
+            E('span', { key: 'count', className: 'dws-sectionCount' }, String(ungrouped.length)),
           ]))
           for (const row of ungrouped) rows.push(renderSessionRow(row, 1))
         }

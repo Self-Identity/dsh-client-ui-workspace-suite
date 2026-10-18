@@ -715,6 +715,14 @@ for (const { options, component } of registrations) {
       if (!budget.strings.includes(expected)) fail('expected row text was not rendered: ' + expected)
     }
     if (budget.strings.includes('已归档会话')) fail('an archived session rendered while the default filter hides archives')
+    // The trailing "ungrouped" bucket is a section: a divider plus a caption, never a
+    // workspace-shaped row (that looked clickable) and never a coloured line.
+    const classOf = (name) => budget.elements.filter((entry) => typeof entry.props.className === 'string'
+      && entry.props.className.includes(name)).length
+    if (classOf('dws-sectionDivider') === 0) fail('the ungrouped section has no divider above it')
+    else if (classOf('dws-sectionTitle') === 0) fail('the ungrouped section has no caption')
+    else if (classOf('dws-sectionCount') === 0) fail('the ungrouped caption carries no count')
+    else console.log('  ungrouped section: divider + caption + count')
     // Native folding: s1 is the current session (always shown), s5..s10 are the
     // idle rows, s3 is running and s4 is ungrouped. Five idle rows show first and
     // the sixth waits behind the control.
