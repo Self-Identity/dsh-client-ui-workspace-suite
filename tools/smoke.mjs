@@ -723,6 +723,17 @@ for (const { options, component } of registrations) {
     else if (classOf('dws-sectionTitle') === 0) fail('the ungrouped section has no caption')
     else if (classOf('dws-sectionCount') === 0) fail('the ungrouped caption carries no count')
     else console.log('  ungrouped section: divider + caption + count')
+    // The pin reorder animation needs the row nodes: every session row must hand back its
+    // DOM node, and the scrolling list must expose its scrollTop for the FLIP offset.
+    const isRefProp = (value) => typeof value === 'function'
+      || (value !== null && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, 'current'))
+    const sessionRowsWithRef = budget.elements.filter((entry) => typeof entry.props.className === 'string'
+      && entry.props.className.includes('dws-sessionRow') && isRefProp(entry.props.ref)).length
+    if (sessionRowsWithRef === 0) fail('session rows do not expose a ref, so the move animation cannot measure them')
+    else if (!budget.elements.some((entry) => typeof entry.props.className === 'string'
+      && entry.props.className.includes('dws-scroll') && isRefProp(entry.props.ref))) {
+      fail('the session list does not expose a ref for its scroll offset')
+    } else console.log('  move animation: ' + String(sessionRowsWithRef) + ' session row(s) tracked')
     // Native folding: s1 is the current session (always shown), s5..s10 are the
     // idle rows, s3 is running and s4 is ungrouped. Five idle rows show first and
     // the sixth waits behind the control.
