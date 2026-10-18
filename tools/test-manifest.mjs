@@ -212,6 +212,14 @@ for (const locale of ['en', 'zh']) {
   if (/'archiveSession'|'unarchiveSession'/.test(browserText)) {
     fail("the browser still calls services.archiveSession/services.unarchiveSession; the face exposes archive/unarchive")
   }
+  // Same class of mistake for pinning: the face exposes pin/unpin, the host method is
+  // called pinSession/unpinSession, so a wrong name fails before reaching the host.
+  if (/boundCall\(services, 'pinSession'|boundCall\(services, 'unpinSession'/.test(browserText)) {
+    fail('the browser calls services.pinSession/services.unpinSession; the face exposes pin/unpin')
+  }
+  if (!/boundCall\(services, 'pin'/.test(browserText) || !/boundCall\(services, 'unpin'/.test(browserText)) {
+    fail('the browser never calls services.pin/services.unpin')
+  }
 }
 
 /* --------------------------- overview card order -------------------------- */

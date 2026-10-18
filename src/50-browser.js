@@ -372,8 +372,8 @@
               iconName: row.pinned ? 'IconPinFillRegular' : 'IconPinOutlineRegular',
               size: 14,
               onClick: () => runAction(row.pinned
-                ? boundCall(services, 'unpinSession', row.id)
-                : boundCall(services, 'pinSession', row.id)),
+                ? boundCall(services, 'unpin', row.id)
+                : boundCall(services, 'pin', row.id)),
             }),
             E(IconButton, {
               key: 'archive',
@@ -409,7 +409,7 @@
               onSelect: (id) => {
                 if (id === 'rename') setDialog({ kind: 'rename-session', id: row.id, draft: title })
                 else if (id === 'fork') runAction(boundCall(services, 'forkSession', row.id))
-                else if (id === 'pin') runAction(row.pinned ? boundCall(services, 'unpinSession', row.id) : boundCall(services, 'pinSession', row.id))
+                else if (id === 'pin') runAction(row.pinned ? boundCall(services, 'unpin', row.id) : boundCall(services, 'pin', row.id))
                 else if (id === 'unarchive' || id === 'archive') toggleArchive(row)
               },
             }),
