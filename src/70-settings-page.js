@@ -113,6 +113,16 @@
             suffix: 'px',
             onChange: (value) => writeSetting('scrollbarWidth', value),
           })),
+          E(SettingRow, {
+            key: 'folderIconColor',
+            label: t('settings.folderIconColor'),
+            hint: t('settings.folderIconColor.hint'),
+          }, E(SuiteColor, {
+            value: iconColorOf(settings),
+            label: t('settings.folderIconColor'),
+            resetLabel: t('settings.folderIconColor.reset'),
+            onChange: (value) => writeSetting('folderIconColor', value),
+          })),
         ]),
         E('div', { key: 'actions', style: { display: 'flex', justifyContent: 'flex-end' } },
           E(SuiteButton, { onClick: resetSettings }, t('settings.reset'))),

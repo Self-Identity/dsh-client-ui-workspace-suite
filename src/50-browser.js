@@ -1052,10 +1052,15 @@
           t('browser.archiveActiveBody', { name: dialog.name }))))
       }
 
+      const iconColor = iconColorOf(settings)
       return E('div', {
         className: 'dws-root' + (wide ? '' : ' dws-root--rail'),
-        // Scopes this plugin's scrollbar width to its own scroll areas.
-        style: { '--suite-scrollbar-width': scrollbarWidthOf(settings) },
+        // Scopes this plugin's scrollbar width to its own scroll areas, and its optional
+        // workspace-icon colour (absent = the stylesheet's theme fallback).
+        style: {
+          '--suite-scrollbar-width': scrollbarWidthOf(settings),
+          ...(iconColor === '' ? {} : { '--suite-workspace-icon-color': iconColor }),
+        },
       }, [
         header,
         // The tree area carries the shipped bottom fade: the last rows dissolve into

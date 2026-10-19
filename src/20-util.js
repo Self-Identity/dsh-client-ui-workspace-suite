@@ -310,6 +310,19 @@
     }
 
     /**
+     * A stored workspace-icon colour, or `''` for "follow the theme".
+     *
+     * Only plain hex is accepted (`#rgb`, `#rrggbb`, `#rrggbbaa`): the value goes into a
+     * CSS custom property, and anything else could smuggle arbitrary declarations in.
+     */
+    function iconColorOf(settings) {
+      const raw = settings === undefined || settings === null ? undefined : settings.folderIconColor
+      if (typeof raw !== 'string') return ''
+      const value = raw.trim()
+      return /^#([0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(value) ? value.toLowerCase() : ''
+    }
+
+    /**
      * Double-click window for the rename/toggle gestures, in milliseconds.
      * Deliberately shorter than the platform default (~500ms on Windows) so a
      * rename reacts immediately; shared by the list, the picker and the overview.

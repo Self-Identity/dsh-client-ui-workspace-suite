@@ -104,8 +104,12 @@
       '.dws-chev:focus-visible{outline:var(--dsw-focus-ring-width,2px) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));outline-offset:-2px}',
       '.dws-chev--open{transform:rotate(90deg)}',
       '.dws-chev--empty{visibility:hidden}',
+      // The folder icon colour follows the shipped rule (tertiary grey) but stays overridable:
+      // `--suite-workspace-icon-color` comes from this plugin's own setting, and
+      // `--dsh-workspace-icon-color` is a documented hook for theme / recolour plugins that
+      // cannot target this plugin's own class names.
       '.dws-folderIcon{flex:none;display:inline-flex;align-items:center;justify-content:center;width:16px;height:20px;',
-      'color:var(--dsw-alias-label-tertiary)}',
+      'color:var(--suite-workspace-icon-color,var(--dsh-workspace-icon-color,var(--dsw-alias-label-tertiary)))}',
       // Expanded folders take the theme's business blue, exactly like the shipped
       // row's active folder; a collapsed folder keeps the resting colour.
       '.dws-folderIcon--active{color:var(--dsw-alias-state-business-primary)}',
@@ -179,6 +183,8 @@
       'border-radius:var(--dsw-radius-sm);border:.5px solid var(--dsw-alias-border-l3);background:var(--dsw-alias-bg-layer-1);',
       'color:var(--dsw-alias-label-primary);outline:none}',
       '.dws-input:focus-visible{border-color:var(--dsw-alias-state-business-primary)}',
+      '.dws-colorInput{flex:none;width:36px;height:24px;padding:0;border:.5px solid var(--dsw-alias-border-l3);',
+      'border-radius:var(--dsw-radius-sm);background:transparent;cursor:pointer}',
       // Switch replicating the shipped control's geometry and tokens (the shell's own
       // `_switch_` rule): 36x20 with a 2px inset, a border-l3 track when off (the old
       // hover-bg track read as plain white on the card), brand-primary when on, and a

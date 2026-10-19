@@ -35,7 +35,7 @@ const names = [
   'usageViewOf', 'boundCall', 'USAGE_KEY',
   'directoryNames', 'packageSummary', 'enginesSummary', 'ENV_PROBE_FILES',
   'selectionStep', 'isBoundaryPath', 'isSiblingPath', 'parentPathOf', 'scrollbarWidthOf', 'mergeSettings',
-  'comparePathNatural', 'subtreeOfPath', 'markdownBlocks', 'markdownInline', 'isSafeHref',
+  'comparePathNatural', 'subtreeOfPath', 'markdownBlocks', 'markdownInline', 'isSafeHref', 'iconColorOf',
 ]
 
 const preamble = [
@@ -72,8 +72,23 @@ const {
   errorMessage, timestamp, usageViewOf, boundCall, USAGE_KEY,
   directoryNames, packageSummary, enginesSummary, ENV_PROBE_FILES,
   selectionStep, isBoundaryPath, isSiblingPath, parentPathOf, scrollbarWidthOf, mergeSettings,
-  comparePathNatural, subtreeOfPath, markdownBlocks, markdownInline, isSafeHref,
+  comparePathNatural, subtreeOfPath, markdownBlocks, markdownInline, isSafeHref, iconColorOf,
 } = exported
+
+/* ---------------------------- icon colour input --------------------------- */
+
+// The value lands in a CSS custom property, so anything but plain hex must be dropped
+// (an arbitrary string there could smuggle extra declarations into the page).
+check('icon colour: empty means theme', iconColorOf({ folderIconColor: '' }), '')
+check('icon colour: missing means theme', iconColorOf({}), '')
+check('icon colour: six-digit hex', iconColorOf({ folderIconColor: '#4D6BFE' }), '#4d6bfe')
+check('icon colour: three-digit hex', iconColorOf({ folderIconColor: '#abc' }), '#abc')
+check('icon colour: eight-digit hex', iconColorOf({ folderIconColor: '#11223344' }), '#11223344')
+check('icon colour: trims whitespace', iconColorOf({ folderIconColor: '  #fff  ' }), '#fff')
+check('icon colour: rejects a bare name', iconColorOf({ folderIconColor: 'red' }), '')
+check('icon colour: rejects a css injection', iconColorOf({ folderIconColor: '#000;background:url(x)' }), '')
+check('icon colour: rejects a var()', iconColorOf({ folderIconColor: 'var(--x)' }), '')
+check('icon colour: rejects a non-string', iconColorOf({ folderIconColor: 12 }), '')
 
 /* --------------------------- markdown renderer ---------------------------- */
 

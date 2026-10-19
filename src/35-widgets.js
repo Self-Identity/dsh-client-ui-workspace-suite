@@ -91,6 +91,33 @@
       })
     }
 
+    /**
+     * A colour input for one optional setting. An empty value means "use the theme":
+     * the swatch then shows a neutral grey and a reset link appears while a colour is set.
+     */
+    function SuiteColor({ value, onChange, label, resetLabel }) {
+      const swatch = typeof value === 'string' && value !== '' ? value : '#8a8a8a'
+      return E('span', { className: 'dws-settingControl' }, [
+        E('input', {
+          key: 'input',
+          type: 'color',
+          className: 'dws-colorInput',
+          'aria-label': label,
+          value: swatch,
+          onChange: (event) => {
+            const next = event.target.value
+            if (typeof next === 'string' && next !== '') onChange(next)
+          },
+        }),
+        typeof value === 'string' && value !== '' ? E('button', {
+          key: 'reset',
+          type: 'button',
+          className: 'dws-textButton',
+          onClick: () => onChange(''),
+        }, resetLabel) : null,
+      ])
+    }
+
     /** A number input keeping a percentage setting inside a sane range. */
     function SuiteNumber({ value, min, max, step, onChange, label, suffix }) {
       return E('span', { className: 'dws-settingControl' },
