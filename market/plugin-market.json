@@ -22,14 +22,21 @@
       "versions": [
         {
           "version": "1.2.0",
-          "publishTimestamp": 1792400092,
+          "publishTimestamp": 1792430100,
           "source": {
             "type": "git",
             "url": "https://github.com/Self-Identity/dsh-client-ui-workspace-suite",
-            "commit": "1b56c6c2a006ac7ddd0ebf4272433b4cb9034543"
+            "commit": "f4fd54308c2cbc47ce156a1c527d3d07ba832c67"
           },
           "engines": {
             "dsh": ">=0.2.1-rc.2 <0.3.0"
+          }
+        },
+        {
+          "version": "1.2.0",
+          "publishTimestamp": 1792430100,
+          "source": {
+            "type": "npm"
           }
         }
       ]
