@@ -1,0 +1,45 @@
+{
+  "format": 1,
+  "title": "DSH plugin market",
+  "description": "Plugin index for the DeepSeek Harness desktop client. Generate or extend an entry with `node tools/release.mjs --index --repo <git url> --write <this file>`.",
+  "metadata": {
+    "categories": {},
+    "labels": {}
+  },
+  "plugins": [
+    {
+      "name": "dsh-client-ui-workspace-suite",
+      "title": "dsh-client-ui-workspace-suite",
+      "description": "Workspace suite for the DSH Web client: an explorer-style picker (browse, inline folder creation, path input, enter-which-workspace chooser), a nested workspace tree with collapse-all and cascade delete, a per-workspace overview page (subtree token totals, expanded session tree, turn jumps, dependencies card, README), and a root-level conversation workspace menu.",
+      "homepage": "https://github.com/Yan-X-X/dsh-client-ui-workspace-suite",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/Yan-X-X/dsh-client-ui-workspace-suite"
+      },
+      "metadata": {
+        "keywords": []
+      },
+      "versions": [
+        {
+          "version": "1.2.0",
+          "publishTimestamp": 1792400062,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/Yan-X-X/dsh-client-ui-workspace-suite",
+            "commit": "6187ad4863c5dd9040393c2eeab0756cafdde0c4"
+          },
+          "engines": {
+            "dsh": ">=0.2.1-rc.2 <0.3.0"
+          }
+        },
+        {
+          "version": "1.2.0",
+          "publishTimestamp": 1792400062,
+          "source": {
+            "type": "npm"
+          }
+        }
+      ]
+    }
+  ]
+}

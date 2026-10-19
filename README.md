@@ -207,8 +207,12 @@ DSH 的目录选择是一个**能力互斥**的服务位：`native` 后端有「
 node tools\build.mjs         # 由 src/*.js 拼装 lib/client.js（ASCII 守卫）
 node --check lib\client.js   # 语法
 npm test                     # 九项校验：manifest/styles/host/util/i18n/smoke
+node tools\release.mjs --check          # 发布字段校验（含构建产物是否过期）
+node tools\release.mjs --index --repo <仓库地址> --npm --write market\plugin-market.json
 node "C:\Users\Yan\.dsh\skills\dsh-plugin-authoring\scripts\check-bundle.mjs" .
 ```
+
+**要对外发布**（插件市场 / npm）请看 [`docs/PUBLISH.md`](docs/PUBLISH.md)：包含换新 GitHub 账号的迁移步骤、索引 format 1 的结构、托管要求（http/https 直链、不得重定向）、客户端如何添加索引，以及发版检查清单。
 
 - `src/` 按文件名顺序拼装（`00-` → `90-`），除 `10-i18n.js` 外必须是纯 ASCII（构建会拦）；
 - 浏览器半区**不得引用任何 `@deepseek-ai/*` 包**，只能用平台种子词；一切能力经 `ctx` / 座位 props 获取；

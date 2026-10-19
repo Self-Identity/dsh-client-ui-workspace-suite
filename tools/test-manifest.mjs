@@ -31,9 +31,20 @@ const pkg = manifest.name
 if (basename(root) !== pkg) fail('directory name does not equal the package name: ' + basename(root) + ' vs ' + pkg)
 if (pkg.startsWith('@')) fail('a locally authored plugin must not use a scope')
 if (!/^dsh-[a-z0-9]+(?:-[a-z0-9]+)*$/.test(pkg)) fail('package name is not dsh-<category>-<topic> kebab-case: ' + pkg)
-if (manifest.private !== true) fail('package.json should stay private')
+if (manifest.private === true) {
+  fail('package.json is private: true, which blocks a market/npm release; the release kit expects a publishable package')
+}
 if (manifest.type !== 'module') fail('package.json should be an ESM module')
 if (manifest.engines === undefined || typeof manifest.engines.node !== 'string') fail('engines.node is not declared')
+// The client refuses to install a package whose engines.dsh range does not cover the host,
+// so the field must exist and name a range that starts at the verified client line.
+if (manifest.engines === undefined || typeof manifest.engines.dsh !== 'string' || manifest.engines.dsh === '') {
+  fail('engines.dsh is not declared; the market install would have nothing to check against')
+}
+if (manifest.license !== 'MIT') fail('license should be MIT')
+if (!Array.isArray(manifest.files) || !manifest.files.includes('lib')) {
+  fail('"files" must include lib so a published package carries the built bundle')
+}
 
 /* -------------------------------- exports -------------------------------- */
 

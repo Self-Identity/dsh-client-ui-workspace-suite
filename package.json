@@ -1,12 +1,13 @@
 {
   "name": "dsh-client-ui-workspace-suite",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Workspace suite for the DSH Web client: an explorer-style picker (browse, inline folder creation, path input, enter-which-workspace chooser), a nested workspace tree with collapse-all and cascade delete, a per-workspace overview page (subtree token totals, expanded session tree, turn jumps, dependencies card, README), and a root-level conversation workspace menu.",
   "license": "MIT",
-  "private": true,
+  "private": false,
   "type": "module",
   "engines": {
-    "node": ">=22.19.0"
+    "node": ">=22.19.0",
+    "dsh": ">=0.2.1-rc.2 <0.3.0"
   },
   "icon": "./icon.svg",
   "exports": {
@@ -31,7 +32,9 @@
   "scripts": {
     "build": "node tools/build.mjs",
     "typecheck": "node --check lib/client.js && node --check lib/index.js",
-    "test": "node tools/test-manifest.mjs && node tools/test-styles.mjs && node tools/test-host.mjs && node tools/test-util.mjs && node tools/test-i18n.mjs && node tools/smoke.mjs"
+    "test": "node tools/test-manifest.mjs && node tools/test-styles.mjs && node tools/test-host.mjs && node tools/test-util.mjs && node tools/test-i18n.mjs && node tools/smoke.mjs",
+    "release:check": "node tools/release.mjs --check",
+    "release:index": "node tools/release.mjs --index"
   },
   "dsh": {
     "manifestVersion": 1,

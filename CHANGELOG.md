@@ -2,7 +2,16 @@
 
 本项目遵循语义化版本；每个版本对应 `package.json` 的 `version`。
 
-## 1.1.0 — 2026-10-17
+## 1.2.0 — 2026-10-19
+
+首个**可对外发布**的版本（`1.1.0` 只在本机迭代、从未发布）。功能内容如下；本版额外补上了发布所需的工程与清单字段。
+
+### 发布工程
+
+- `package.json`：`private` 置为 `false`、新增 `engines.dsh`（`>=0.2.1-rc.2 <0.3.0`）、版本 1.1.0 → **1.2.0**；新增 `release:check` / `release:index` 脚本。
+- `tools/release.mjs`：发布前校验（包名/SemVer/`private`/`engines.dsh`/`bundle.patch` 存在/构建产物是否比 `src/` 旧/`files` 含 `lib`/README+LICENSE/图标 ≤24 KiB）+ 生成「插件市场索引 format 1」条目（git 精确 commit 与 npm 两种来源）。
+- `market/plugin-market.json`：可直接托管的索引（format 1），由 `--write` 合并维护旧版本条目。
+- `docs/PUBLISH.md`：换新 GitHub 账号的迁移、发版流程、索引托管、客户端添加索引、npm 发布与检查清单。
 
 这一版把「工作区」从平铺列表整理成可浏览、可总览、可选对入口的四件套，并修掉一批长期存在的交互缺陷。
 
