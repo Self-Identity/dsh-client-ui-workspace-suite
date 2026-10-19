@@ -22,11 +22,11 @@
       "versions": [
         {
           "version": "1.2.0",
-          "publishTimestamp": 1792400062,
+          "publishTimestamp": 1792400092,
           "source": {
             "type": "git",
             "url": "https://github.com/Yan-X-X/dsh-client-ui-workspace-suite",
-            "commit": "6187ad4863c5dd9040393c2eeab0756cafdde0c4"
+            "commit": "1b56c6c2a006ac7ddd0ebf4272433b4cb9034543"
           },
           "engines": {
             "dsh": ">=0.2.1-rc.2 <0.3.0"
@@ -34,7 +34,7 @@
         },
         {
           "version": "1.2.0",
-          "publishTimestamp": 1792400062,
+          "publishTimestamp": 1792400092,
           "source": {
             "type": "npm"
           }
