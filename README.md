@@ -1,5 +1,8 @@
 # dsh-client-ui-workspace-suite
 
+[![npm](https://img.shields.io/npm/v/dsh-client-ui-workspace-suite.svg)](https://www.npmjs.com/package/dsh-client-ui-workspace-suite)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 Workspace suite for the DSH Web client: an explorer-style picker, a nested workspace tree, a per-workspace overview page, and a root-level conversation workspace menu.
 
 把 DSH 客户端的「工作区」从一层平铺列表，升级成可浏览的目录树：选目录、看层级、看总览、开会话时选对工作区。
@@ -95,7 +98,7 @@ The directory-picker service is mutually exclusive: the `native` backend offers 
 ## Install
 
 1. Client sidebar → **Plugins** → **Add plugin**.
-2. Choose this package: the local source directory, or the npm package name once published.
+2. Enter `dsh-client-ui-workspace-suite@1.2.0` (or choose the local source directory).
 3. **Install** → **Enable now**; restart the client if it says the change takes effect on the next start.
 4. The card must read **Enabled / Mounted**. The workspace list then switches to the tree view.
 
@@ -147,4 +150,4 @@ node tools/release.mjs --check
 
 ## License
 
-MIT. Not affiliated with DeepSeek.
+MIT. Not affiliated with DeepSeek. 与 DeepSeek 官方无隶属关系。
