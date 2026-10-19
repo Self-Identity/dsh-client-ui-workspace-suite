@@ -1,252 +1,150 @@
-# 工作区套件 · dsh-client-ui-workspace-suite
+# dsh-client-ui-workspace-suite
 
-> 把 DSH 客户端的「工作区」从一层平铺列表，升级成**可浏览的目录树**：选目录、看层级、看总览、开会话时选对工作区。
->
-> 版本 **1.1.0** ｜ 目标宿主 `@deepseek-ai/dsh-desktop-runtime 0.2.1-rc.1` ｜ 客户端渲染层插件（无 Host 工具、无网络请求）
+Workspace suite for the DSH Web client: an explorer-style picker, a nested workspace tree, a per-workspace overview page, and a root-level conversation workspace menu.
 
----
+把 DSH 客户端的「工作区」从一层平铺列表，升级成可浏览的目录树：选目录、看层级、看总览、开会话时选对工作区。
 
-## 30 秒理解：它解决什么
+> Target host: `@deepseek-ai/dsh-desktop-runtime 0.2.1-rc.2` · renderer-only bundle (no host tools, no network requests)
 
-DSH 原生的工作区是**一层平铺**的：每个工作区一行，看不到磁盘层级；「添加工作区」弹的是系统目录框（只能选一个目录，看不到里面）；进入会话时也不会问你「这个根工作区下有多个子项目，进哪一个」。
+## Modules
 
-本插件用四个可独立开关的模块补齐这四件事：
+Four independently switchable modules, enabled by default. Each can be turned off in **Plugins → Configure** to return to the shipped behaviour.
 
-| 你的痛点 | 本插件的答案 | 开关 |
+| Pain point | What the plugin does | Switch |
 |---|---|---|
-| 选目录只能用系统框，看不到层级、不能新建文件夹 | **资源管理器式选择弹窗**：逐级浏览、悬停新建子文件夹、输入路径、提交后选进入哪个工作区 | `modulePicker` |
-| 工作区列表平铺，monorepo 里子项目混在一起 | **多级工作区树**：按磁盘目录嵌套、一键折叠、行内新建会话、删除级联 | `moduleTree` |
-| 想一眼看清一个工作区里有什么、花了多少 Token | **工作区总览页**：子树 Token 总量与按模型明细、完全展开的会话树、轮次跳转、依赖与环境卡、根 README | `moduleOverview` |
-| 会话窗口的工作区菜单列出一堆同名子目录（`src`、`lib`） | **接管该菜单**：只列根级工作区；选中含子工作区的项时先问用哪一个开始会话 | `moduleHeroMenu` |
+| The directory picker is a native dialog: no hierarchy, no folder creation | Explorer-style picker: browse level by level, create a folder inline, type a path, then choose which workspace to enter | `modulePicker` |
+| The workspace list is flat, so monorepo sub-projects blur together | Nested workspace tree: folder hierarchy, collapse all, inline session creation, cascade delete | `moduleTree` |
+| No way to see what a workspace contains or how many tokens it has spent | Workspace overview: subtree token totals with per-model detail, fully expanded session tree, turn jumps, dependencies card, README | `moduleOverview` |
+| The conversation workspace menu lists every `src` / `lib` sub-folder | Root-level only; when the chosen item has registered sub-workspaces, ask which one to start in | `moduleHeroMenu` |
 
-四个模块默认全开，任意一个都可以在**插件 → 配置**里单独关闭、回到出厂行为。
+### 1. Explorer-style picker
 
----
+- Both entry points (`Add workspace` in the hero, `＋ Add` in the sidebar) open it.
+- Tree: click a row to expand or collapse; double-click or click the checkbox to pick; picking a folder expands it automatically.
+- **Inline folder creation**: hover the `＋` at the end of a row, type a name, press `Enter` (or click elsewhere). Empty names are refused; duplicates are reported inline.
+- **Path input**: paste an absolute path and press `Enter`; the ancestor chain is expanded only down to that level and focused.
+- **Nestable selection**: a new pick must be comparable with the current selection (ancestor, descendant or sibling). Siblings pull in their common parent but never the whole drive root.
+- After confirming, choose which workspace to enter; the root is selected by default and `Skip` only registers the selection.
 
-## 你会得到什么
+### 2. Nested workspace tree
 
-### 1. 资源管理器式选择弹窗（替代系统目录框）
+- Workspaces nest by their nearest registered ancestor directory; the order inside a level is folder icon → parent workspace → parent sessions → sub-workspaces.
+- Pin / unpin reorders a session to the top of its workspace with a 180ms FLIP animation that respects `prefers-reduced-motion`.
+- The collapse button next to the search field folds every sub-workspace; the state persists.
+- Rows are `role=treeitem` with `aria-expanded`, so the tree is keyboard navigable.
+- Deleting a workspace cascades from the deepest level until the subtree is clean, and reports what refuses to go.
+- Ungrouped sessions form their own section at the end of the list: a hairline divider plus a small section header, not a fake workspace row.
 
-- **两个入口**都走它：新对话页的「添加工作区」、侧边栏的「＋添加」。（工作区行的「更多」里曾有「工作区选择」，已**移除**：宿主没有把已有会话移交给另一个工作区的 API，详见「边界与风险」。）
-- 左侧目录树：单击行展开/收起；**双击行或点复选框**勾选；勾选后自动展开该目录。
-- **悬停行尾「＋」新建子文件夹**：就地出现命名框，`Enter` 或**点击别处**即创建（空名不创建）；同级重名会行内提示改名。
-- **顶部路径行**：显示**已选结构的根节点**（例如勾了 `plugins`、`dsh-host-mobile-gateway`、`deploy` 就只显示 `F:\DSH-Official\plugins`），未勾选时显示当前浏览层级；超长省略、悬浮看完整路径。
-- **「输入路径…」**：点击时输入框默认全选当前路径；回车先校验能否读取，成功则把祖先链逐层展开、**只展开到该级**、聚焦到那一行，并按勾选约束选中它。
-- **勾选约束（保持可嵌套）**：新勾选必须与现有选择**可比**（祖先、后代或**兄弟**）。勾更深的子级会自动补勾到最近已勾祖先之间的中间层；勾**兄弟文件夹**会补上共同父节点（但**不会**因此拉入整个盘符）；不可比时才弹「不在同一目录树中」，确认后清空重选。
-- **取消勾选父节点**会连带取消其全部已选子节点。
-- **提交后「进入哪个工作区」**：只列刚刚确认的结构、完全展开、**默认选中根节点**；「进入」在该工作区新建会话，「跳过」则只注册不进。
-- 弹窗内容区可滚动（目录树内部滚动、底部按钮常驻），底部留白。
+### 3. Workspace overview
 
-### 2. 多级工作区树（接管侧边栏列表）
+Entry: workspace row → **More** → **Workspace overview**.
 
-- 工作区按「**最近已注册祖先目录**」嵌套；层内顺序：文件夹 icon → 父工作区 → 父工作区会话 → 子工作区。
-- 行内：文件夹 icon（展开后变为打开态）、名称（自定义名后跟半透明灰原名）、相对时间、悬停操作（置顶/归档）、「更多」菜单。
-- **置顶/取消置顶**：行会立刻排到所在工作区会话最上方，并带 **180ms 位移动画**（FLIP：记录行的旧位置 → 新位置，用 `transform` 过渡；尊重系统「减少动态效果」设置）。
-- 搜索框旁**折叠按钮**（纯图标）：一键收纳/展开所有子工作区，状态持久化。
-- 侧边栏折成 56px 轨道时，头部改为纵向图标列；搜索会先展开侧边栏再聚焦。
-- 行是 `role=treeitem` + `aria-expanded`，键盘可展开/收起；弹窗树的展开箭头是真正可聚焦的按钮。
-- **删除工作区会级联**：由深到浅多轮删除直到干净，残留时提示。
-- **「未分组」是独立分区**：不属于任何工作区的会话收在列表末尾，上方一条**主题细分割线** + 小号小节标题（带数量徽标），而不是伪装成一个工作区行——避免"看起来能点"和"蓝线像选中态"两个误读。
-- **缩进三级相对关系**（都以"行左沿 8px"为基准）：每嵌套一级**工作区**行右移 **22px**（= 文件夹图标 16px + 行内间距 6px），所以**子级工作区图标左沿对齐父级标题文本左沿**（相对行左沿 8+16+6 = 30px）；**会话**行永远在自己工作区基础上 **+3px**（根级会话仍是 11px，不变），**轮次/更多**行再 **+6px**。这样任意深度下会话都不会跑到所属工作区左侧。
+- Header: folder icon, name, absolute path, and the token total of the workspace **and all its sub-workspaces** (hover for the per-model split).
+- Fully expanded session tree; token numbers appear here only.
+- Dependencies card (optional): one directory listing plus fixed probes for `package.json`, `tsconfig.json`, `Dockerfile` and `.nvmrc`. It never recurses and never reads lockfiles.
+- Recent turns per session, linked back into the session.
+- Root `README.md` rendered by the plugin's own lightweight Markdown renderer (no HTML injection; `javascript:` links are not clickable).
 
-### 3. 工作区总览页
+### 4. Conversation workspace menu
 
-入口：工作区行 →「更多」→「工作区总览」。（不是并排的第二个侧栏图标。）
+- Lists root-level workspaces only.
+- Choosing an item that has registered sub-workspaces asks which one to start the session in.
+- `Add workspace` is pinned to the top and opens the explorer-style picker.
 
-1. **头部**：根工作区文件夹图标 + 名称（含备注/原名规范）+ 绝对路径 + 该工作区**及其全部子工作区**的 Token 总量（悬浮看按模型拆分）；可切换根工作区、**刷新**。
-2. **完全展开的会话树**：复用列表行样式（`dws-wsRow`/`dws-sessionRow`），每个工作区显示自身会话 Token 合计，每个会话显示该会话合计（Token 数字只在这里出现）。
-3. **依赖与环境卡**（可关，排在会话树**下方**）：只读顶层，固定少量调用——一次目录列举（子目录）+ 对 `package.json`、`tsconfig.json`、`Dockerfile`、`.nvmrc` 的定点探测；展示包名/版本、包管理器、脚本与依赖数量、`engines`、工程配置存在性。**不递归、不读锁文件**。
-4. **轮次链接**：每个会话后显示最近若干轮，点击打开会话并滚动定位到该轮。
-5. **根工作区 README.md**：用**插件自带的轻量 Markdown 渲染**（标题分级、列表/嵌套、代码块与行内代码、表格、引用、分隔线、粗斜体/删除线、链接；不注入 HTML、`javascript:` 链接不转为可点），可设最大高度（排在最后）。
-   > 说明：本机这版客户端没有出厂 `MarkdownText` 原语，所以之前只能退化成纯文本；现在由插件自己渲染。
+## Settings
 
-> Token 图**不提供**：趋势图及其容器已移除（按需求），Token 仍以总量、按模型悬浮明细和每行徽标呈现。
-
-### 4. 会话窗口的工作区菜单（接管）
-
-出厂菜单列出**每一个**工作区且只显示标题，`src`/`lib` 这类子目录单独出现时无法辨认。本模块接管后：
-
-- **只列根级工作区**（没有已注册祖先者）；
-- 选中**含已注册子工作区**的项 → 弹出该子树的结构选择（完全展开、单选、默认选中你点的那个）→ 进入所选；
-- 选中无子级者 → 直接进入（出厂行为）；
-- 「**添加工作区**」置顶且做强调样式，走的仍是本插件的选择弹窗。
-
----
-
-## 典型使用场景
-
-| 场景 | 怎么用 |
+| Group | Keys |
 |---|---|
-| **Monorepo / 多子项目**：一个根目录下十来个服务，希望每个服务各自是工作区 | 在「＋添加」里勾上要的子目录（兄弟勾选会补共同父节点）→ 列表变成两三层树 |
-| **一个盘里散落很多项目** | 「＋添加」→ 直接用「输入路径…」粘贴路径（默认全选、回车即展开并聚焦）→ 勾选 → 进入 |
-| **经常新建子项目** | 在列表或弹窗里悬停目标目录 → 「＋」→ 输名字 → 回车（或点别处）即创建 |
-| **想知道「这次会话在哪个子工作区」** | 会话窗口点工作区名：只列根级，选中根时先让你选具体子工作区再进入 |
-| **把工作区当项目首页** | 每个根工作区写 `README.md`；总览页底部直接渲染，顶部还有依赖与环境速览 |
-| **清理过期工作区** | 列表行「更多 → 删除工作区」：会级联删除其下所有子工作区（有确认与数量提示） |
+| Modules | `modulePicker`, `moduleTree`, `moduleOverview`, `moduleHeroMenu` |
+| Picker | `pickerDepth` (levels expanded on open, 0 = current level only) |
+| Workspace list | `treeMaxHeightPct`, `treeScroll`, `collapseAllByDefault`, `includeArchived`, `includeSubagent` |
+| Overview | `showTokens`, `showTurns`, `showEnv`, `readme`, `readmeMaxHeightPct` (15–90) |
+| Appearance | `scrollbarWidth` (4–20px, default 8px) for this plugin's own scroll areas |
 
----
+The scrollbar width chain is `--suite-scrollbar-width` → the global `--dsh-scrollbar-width` → 8px, so it follows `dsh-client-ui-thick-scrollbar` when that plugin is installed.
 
-## 边界与风险（请先读这一节）
+## Boundaries
 
-### 它接管了什么
+### What it takes over
 
-| 类型 | 对象 | 说明 |
+| Kind | Target | Note |
 |---|---|---|
-| 插槽（影子注册） | `sidebar.workspaces`（priority `-100`） | 整块接管侧边栏工作区列表 |
-| 插槽（影子注册） | `conversation.hero.workspace`（priority `-1`） | 接管会话窗口的工作区菜单 |
-| 插槽（占位） | `sidebar.workspaces.directoryFlow`、`conversation.hero.workspace.directoryFlow`（priority `-1`） | 两个「添加工作区」弹窗位 |
-| 组合行 | `- id: directory-picker` → **disabled**，并插入 `dsh-host-directory-picker-browse`、`dsh-client-ui-directory-picker-browse` 与本插件行 | 见下条 |
+| Slot (shadow) | `sidebar.workspaces` (priority `-100`) | Replaces the whole workspace list |
+| Slot (shadow) | `conversation.hero.workspace` (priority `-1`) | Replaces the conversation workspace menu |
+| Slot (placeholder) | `sidebar.workspaces.directoryFlow`, `conversation.hero.workspace.directoryFlow` | The two add-workspace dialog seats |
+| Composition row | `directory-picker` disabled; inserts the browse backend, its UI and this package | See below |
 
-### 全局副作用：系统目录选择框会消失
+### Global side effect: the native directory dialog disappears
 
-DSH 的目录选择是一个**能力互斥**的服务位：`native` 后端有「系统对话框」但没有「列目录」，`browse` 后端有「列目录」但没有对话框。本插件为了做应用内浏览器，把服务位钉在 `browse` 上，因此：
+The directory-picker service is mutually exclusive: the `native` backend offers the system dialog but cannot list directories, while the `browse` backend lists directories but has no dialog. To build the in-app explorer, this bundle pins the service to `browse`. Therefore, while the bundle is enabled, no part of the application opens the system directory dialog. Switching off the picker module does **not** restore it — the browse backend is still composed. Disable (or uninstall) the whole bundle and restart to get the system dialog back.
 
-- **只要本组合包处于启用状态，整个应用就不再出现系统目录选择框**（包括其它插件/功能里需要选目录的地方）；
-- 关掉**选择弹窗模块**不等于恢复系统框：patch 行仍生效，出厂的 browse 界面会顶上来（仍是应用内弹窗）；
-- 想恢复系统框：在插件页把**本组合包禁用**（或卸载），重启即可。
+### What it does not do
 
-### 插件的边界（它不做什么）
+- It does not modify session content, model behaviour or any network request.
+- It does not write files, except creating a sub-folder when you explicitly press `＋`.
+- It does not read the contents of your project files: the overview reads only `README.md`, and the dependencies card reads only the four files above. Directory listings carry names, not file contents.
+- It does not move sessions between workspaces: a session belongs to the `cwd` it was created with, and the host exposes no API to reassign it.
 
-- **不修改会话内容**、不改模型行为、不代理任何网络请求；没有任何出站连接。
-- **不写你的文件**：唯一写操作是你在弹窗里显式点「＋」新建子文件夹。
-- **不读写工作区里的业务文件内容**：总览只读取 `README.md` 文本用于渲染，依赖卡只读 `package.json` 等四个固定文件；目录只拿**子目录名**（`browse` 后端本身就只返回目录，不返回文件）。
-- **不动 profile**：安装/启用/禁用由客户端写 `%USERPROFILE%\.dsh\profiles\desktop`；卸载后残留只有浏览器里的两个 localStorage 键（见下）。
-- **不迁移会话归属**：会话属于哪个工作区由它的 `cwd` 决定（创建时固定），宿主没有"把会话移交给另一个工作区"的 API（`dsh-api-workspace-controller` 只提供工作区注册表、归档/置顶集合与会话**排序**）。因此原计划中的「工作区重定位」已**放弃**，工作区行「更多」里的「工作区选择」入口一并移除。
+### Known limitations
 
-### 风险与已知限制
+1. **Host contracts**: slot ids, primitive names, composition row ids and service methods come from the client implementation. A client upgrade may change them.
+2. **Conflicts**: several shadow registrations on the same slot compete by priority (`-100` / `-1` here). Only one wins.
+3. **Preferences are browser-local**: `dsh-workspace-suite.settings.v1` and the boot record `dsh-workspace-suite.boot` live in `localStorage`; changing machines or clearing storage resets them.
+4. **Not affiliated with DeepSeek**: this is a community plugin, not an official package.
 
-1. **依赖宿主内部契约**：插槽 id、原语名、组合行 id、服务方法都来自客户端实现。客户端升级可能改动它们，届时功能可能失效（见「版本兼容」与「排查」）。
-2. **可能与同类插件冲突**：同一插槽的多个接管者按 priority 竞争，本插件用 `-100`/`-1`，通常会赢；若你也装了接管同一插槽的插件，只有一个能生效。同一组合行被两个包同时 `disabled` 也会互相影响。
-3. **与官方无隶属关系**：这是本机自建插件（`private`），不是官方包，不受官方支持；出问题请先在 README 的排查节自检。
-4. **目录会被客户端升级清空**（本机实测）：插件源码必须另外留版本库；升级后把目录放回（旧路径是目录联接，指向新根）并检查 profile 是否仍列出本 bundle。
-5. **偏好存在浏览器**：`localStorage` 的 `dsh-workspace-suite.settings.v1`（设置）与 `dsh-workspace-suite.boot`（启动诊断，保留最近 3 条失败）。换机器/清缓存会重置设置。
-6. **未验证项**：见文末「已验证 / 未验证」——不要把未验证的条目当成已验证。
+## Install
 
----
+1. Client sidebar → **Plugins** → **Add plugin**.
+2. Choose this package: the local source directory, or the npm package name once published.
+3. **Install** → **Enable now**; restart the client if it says the change takes effect on the next start.
+4. The card must read **Enabled / Mounted**. The workspace list then switches to the tree view.
 
-## 安装
+Enabling the bundle disables the shipped `directory-picker` row (see Boundaries); disabling the bundle restores the native dialog.
 
-1. 客户端侧边栏 → **插件** → **添加插件**；
-2. 填本目录绝对路径：`F:\DSH-Official-Plugins\dsh-client-ui-workspace-suite`（旧路径 `F:\DSH-Official\plugins\dsh-client-ui-workspace-suite` 是目录联接，同样可用）；
-3. **安装** → **立即启用**；
-4. 若提示「改动在下次启动生效」，重启客户端。
+## Compatibility
 
-> **目录迁移记录（2026-10）**：源码目录从 `F:\DSH-Official\plugins\<包名>` 迁到 **`F:\DSH-Official-Plugins\<包名>`**（同批还有 `dsh-preset-requirement-confirm`、`dsh-host-mobile-gateway`）。旧路径保留为 **Junction** 指向新位置，profile 的依赖路径与 `node_modules` 联接已直接指向新根。
+Verified against `@deepseek-ai/dsh-desktop-runtime 0.2.1-rc.2`:
 
-## 设置
-
-插件管理页 → 本插件卡片 → 配置区（分组与模块一一对应，改动即时生效、无需重启渲染层）。
-
-**功能模块（4 个开关）**
-
-| 键 | 默认 | 关闭后 |
-|---|---|---|
-| `modulePicker` | 开 | 「添加工作区」回到出厂的 browse 弹窗（系统框不会回来，见「边界」） |
-| `moduleTree` | 开 | 侧边栏工作区列表回到出厂平铺样式 |
-| `moduleOverview` | 开 | 移除总览面板入口与页面 |
-| `moduleHeroMenu` | 开 | 会话窗口的工作区菜单回到出厂实现 |
-
-**选择弹窗**：`pickerDepth`（默认 1）打开时预先展开的目录层数，0 表示只展开当前层。
-
-**工作区列表**：`treeMaxHeightPct`（100 = 填满到账号行）、`treeScroll`（超高时内部滚动）、`collapseAllByDefault`（默认折叠）、`includeArchived`、`includeSubagent`（统计口径）。
-
-**总览页**：`showTokens`、`showTurns`、`showEnv`（依赖与环境卡）、`readme`（渲染根 README）、`readmeMaxHeightPct`（15–90）。「恢复默认」一键还原。
-
-**外观**：`scrollbarWidth`（4–20px，默认 **8px**）只作用于本插件的滚动区（列表、弹窗目录树、总览页）。取值链是 `--suite-scrollbar-width` → 全局滚动条插件的 `--dsh-scrollbar-width` → 8px，因此装了 `dsh-client-ui-scrollbar-tuner` 时会跟随它的全局宽度，没装时默认 8px。
-
-## 与出厂行为的差异（照抄出的细节）
-
-| 项 | 出厂 | 本插件 |
-|---|---|---|
-| 工作区列表结构 | 一层平铺、按标题/时间排序 | 按磁盘目录嵌套；层内固定顺序；折叠状态持久化 |
-| 目录选择 | 系统对话框（Windows 资源管理器） | 应用内资源管理器（见「边界」的全局副作用） |
-| 会话窗口工作区菜单 | 列全部工作区、只显示标题 | 只列根级；含子工作区时先选具体项；「添加工作区」置顶强调 |
-| 双击语义 | 平台默认（Windows ~500ms） | 自绘 **300ms** 判定窗口；第一击仍执行单击动作 |
-| 会话归档 / 还原 | 行内动作，运行中的会话需先停活动 | 与出厂一致：服务面走 `archive`/`unarchive`；遇到"会话仍在运行"的拒绝时弹确认，确认后带 `{ stopActivity: true }` 重试 |
-| 删除工作区 | 单条删除 | 级联删除整棵子树（确认框列出数量与名称），多轮直到干净 |
-| 悬停标题 | 出现省略号 | 爬动时改用渐隐遮罩，不再用「…」截断可见文字 |
-| 展开文件夹 icon | 常驻三角/闭合态 | 行本身即展开控件；展开后 icon 变主题蓝打开态 |
-
-## 版本兼容
-
-目标宿主 **`@deepseek-ai/dsh-desktop-runtime 0.2.1-rc.1`**（配套 `@deepseek-ai/dsh-client-ui-workspace 0.2.1-rc.1`）。本版本已重新解包 `app.asar` 逐项核对：
-
-| 依赖的契约 | 0.2.1-rc.1 实测 | 说明 |
-|---|---|---|
-| 平台种子词 `react` / `@deepseek-ai/dsh-client-store` / `@deepseek-ai/dsh-client-ui-primitives` | ✅ 在 `staticModules` 中 | 包目录已内联进 web 壳，但种子词不变，`require` 仍可解析 |
-| 插槽 `sidebar.workspaces`、`sidebar.workspaces.directoryFlow`、`conversation.hero.workspace`、`conversation.hero.workspace.directoryFlow` | ✅ 全部存在 | 未改名 |
-| 组合行 `directory-picker`（`@deepseek-ai/dsh-host-directory-picker-auto`） | ✅ 仍在 `dsh-web-app/cordis.patch.yml` | 「禁用该行 + 插入 browse 后端」的做法继续成立 |
-| `workspace-files` 行（`remote.workspaceFiles`） | ✅ 存在 | README 与依赖卡读取依赖它 |
-| 原语 `Menu`/`MenuItemButton`/`Modal`/`HoverCard`/`MarkdownText`/`Tooltip` + 25 个图标 | ✅ 全部存在 | 缺失时走本插件自带降级实现 |
-| 服务 `slots`/`locale`/`sessions`/`workspaces`/`uiWorkspace`/`layout`/`remote` 及其被调方法 | ✅ 均被出厂代码同名调用 | 本插件对每个调用走 `boundCall` 容错 |
-
-若宿主升级后异常：先跑 `node tools/build.mjs` 与九项校验，再对照上表排查；必要时按新版本重解包 `app.asar` 核对。
-
-## 排查「启用了但界面没变化」
-
-浏览器半区把启动进度写进 `localStorage` 的 **`dsh-workspace-suite.boot`**（ASCII JSON，保留最近 3 条失败）。Electron 的 localStorage 存在 `%APPDATA%\@deepseek-ai\dsh-desktop\Local Storage\leveldb\*.log`，可直接在磁盘上检索：
-
-| 记录 | 含义 |
+| Contract | Status |
 |---|---|
-| `apply-ok` / `registered` | Host 行已装配、注册数正常 |
-| `services-at-apply` | apply 时哪些服务还没就绪（本版本会在首次使用时自愈） |
-| `overview-failed` | 总览页渲染异常（页面会显示失败卡并把异常消息写在下面） |
-| `factory-failed` / `entry-inert` | 浏览器半区加载失败（插件会降级为空实现而不是让应用崩溃） |
+| Platform seeds `react`, `@deepseek-ai/dsh-client-store`, `@deepseek-ai/dsh-client-ui-primitives` | Present |
+| Slots `sidebar.workspaces`, `sidebar.workspaces.directoryFlow`, `conversation.hero.workspace`, `conversation.hero.workspace.directoryFlow` | Present |
+| Composition row `directory-picker` (`@deepseek-ai/dsh-host-directory-picker-auto`) | Present; can be disabled and replaced by the browse backend |
+| `workspace-files` row (`remote.workspaceFiles`) | Present; used by the README card and dependencies card |
+| Primitives `Menu` / `MenuItemButton` / `Modal` / `HoverCard` / `MarkdownText` / `Tooltip` and the icons | Present; missing primitives fall back to built-in renderers |
+| Services `slots` / `locale` / `sessions` / `workspaces` / `uiWorkspace` / `layout` / `remote` | Present; every call goes through a tolerant wrapper |
 
-常见原因：① 未重启（bundle 变更需重启）；② profile 的 `dsh.profile.bundles` 里没有本包；③ 与其它接管同一插槽的插件冲突；④ 客户端升级后路径失效。
+After a client upgrade, rebuild and run the test suite before assuming a contract is still valid.
 
-## 卸载
+## Troubleshooting
 
-1. 插件页 → 本插件卡片 → **禁用**（或卸载）→ 重启。禁用后 patch 行随之撤销，**系统目录选择框恢复**；
-2. 源码目录可保留（升级后还要放回）；确认无用后删除 `F:\DSH-Official-Plugins\dsh-client-ui-workspace-suite` 与旧路径联接；
-3. 可选：清除浏览器里的 `dsh-workspace-suite.settings.v1` 与 `dsh-workspace-suite.boot`。
+The browser half writes its boot progress into `localStorage` under `dsh-workspace-suite.boot` (ASCII JSON, last three failures kept).
 
-## 开发者说明
+| Record | Meaning |
+|---|---|
+| `apply-ok` / `registered` | Host row applied, registrations complete |
+| `services-at-apply` | A service was not ready at apply time; it self-heals on first use |
+| `overview-failed` | The overview page failed to render; the page shows a failure card |
+| `factory-failed` / `entry-inert` | The browser half failed to load; the plugin degrades to a no-op |
+
+Common causes: the client was not restarted; the package is missing from `dsh.profile.bundles`; another plugin shadows the same slot; the client upgrade moved a path.
+
+## Development
 
 ```powershell
-node tools\build.mjs         # 由 src/*.js 拼装 lib/client.js（ASCII 守卫）
-node --check lib\client.js   # 语法
-npm test                     # 九项校验：manifest/styles/host/util/i18n/smoke
-node tools\release.mjs --check          # 发布字段校验（含构建产物是否过期）
-node tools\release.mjs --index --repo <仓库地址> --npm --write market\plugin-market.json
-node "C:\Users\Yan\.dsh\skills\dsh-plugin-authoring\scripts\check-bundle.mjs" .
+node tools/build.mjs          # assemble lib/client.js from src/*.js
+node --check lib/client.js
+npm test                      # manifest / styles / host / util / i18n / smoke
+node tools/release.mjs --check
 ```
 
-**要对外发布**（插件市场 / npm）请看 [`docs/PUBLISH.md`](docs/PUBLISH.md)：包含换新 GitHub 账号的迁移步骤、索引 format 1 的结构、托管要求（http/https 直链、不得重定向）、客户端如何添加索引，以及发版检查清单。
+`src/` is assembled in file-name order (`00-` → `90-`); every file except `10-i18n.js` must stay pure ASCII (the build enforces it). The browser half must not import any `@deepseek-ai/*` package: capabilities arrive through `ctx` and the seat props, and only platform module seeds are resolved.
 
-- `src/` 按文件名顺序拼装（`00-` → `90-`），除 `10-i18n.js` 外必须是纯 ASCII（构建会拦）；
-- 浏览器半区**不得引用任何 `@deepseek-ai/*` 包**，只能用平台种子词；一切能力经 `ctx` / 座位 props 获取；
-- 接管类注册的硬约束：影子注册**不得重新声明被影子条目的子洞**；hook 组件必须用 `E(Name, …)` 渲染（`test-manifest` 有专门守卫）；
-- 组合层改动与原因写在 `cordis.patch.yml` 的注释里；九项校验中的 `smoke.mjs` 会断言注册集、行渲染、弹窗流程、hook 数量不变量与缩进阶梯。
+## Uninstall
 
-## 已验证 / 未验证
+1. Plugins → this bundle → **Disable** (or uninstall) → restart. Disabling the bundle also withdraws the composition patch, so the native directory dialog returns.
+2. Optionally clear `dsh-workspace-suite.settings.v1` and `dsh-workspace-suite.boot` from `localStorage`.
 
-- **已验证**：构建与九项校验全绿；`lib/index.js` 无 import；组合补丁行可解析；0.2.1-rc.1 的契约核对（上表）；selection 规则的四条约束单元测试；hook 放置守卫；缩进阶梯；弹窗 add 流程断言。
-- **未验证（需要真机逐项确认）**：四个模块在真实渲染器里的视觉细节（弹窗滚动、留白、爬动标题、缩进观感）、`moduleHeroMenu` 开关在真实客户端里的接管/回收、依赖卡在真实工作区上的读数、总览页在大量会话下的性能。请以客户端实际表现为准，有问题按「排查」抓 `dsh-workspace-suite.boot`。
+## License
 
-## 后续迭代考虑（未实施）
-
-### 新会话入口的输入与预设模式记忆
-
-**现象**：在「新对话」输入框里打了字但没发送，切到别的页面再回来，输入内容清空、agent 预设模式回到默认。
-
-**已核实的机制**（读 `@deepseek-ai/dsh-client-ui-conversation` 的客户端实现）：
-
-```js
-CONVERSATION_STORE_KEY = "dsh.conversation"
-localStorage["dsh.conversation.<sessionId>"] = { draft: { text, references }, view }
-// 进入会话时：shell.setDraft(readConversationDraft(binding.sessionId))
-```
-
-草稿是**按会话 id** 持久化的；新会话页还没有 sessionId（首次发送才创建），所以没有可用的持久化键，离开页面即丢——不是设置问题，是宿主没有"新会话草稿"这条通路。
-
-**若要实施，只剩两条路**：
-
-1. **等宿主**给新会话草稿一个稳定键（或用 `dsh.conversation.<临时 id>` 的正式约定）——最稳，需上游支持；
-2. **插件侧 DOM 观察**：监听新会话输入框的 `input` 事件写入本地存储、回到页面时回填。能实现但依赖宿主 DOM 结构，升级可能失效；agent 预设是 React 受控状态，恢复需要合成事件，风险更高。
-
-当前决定：**暂不实施**，先记录于此。若要做，建议先只做第 1 条路（或第 2 条只覆盖文本、预设模式明确不做）。
-
-## 许可
-
-MIT（见 `LICENSE`）。本插件与 DeepSeek 官方无隶属关系。
+MIT. Not affiliated with DeepSeek.

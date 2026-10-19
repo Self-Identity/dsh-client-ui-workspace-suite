@@ -3,7 +3,15 @@
   "version": "1.2.0",
   "description": "Workspace suite for the DSH Web client: an explorer-style picker (browse, inline folder creation, path input, enter-which-workspace chooser), a nested workspace tree with collapse-all and cascade delete, a per-workspace overview page (subtree token totals, expanded session tree, turn jumps, dependencies card, README), and a root-level conversation workspace menu.",
   "license": "MIT",
-  "private": false,
+  "author": "Self-Identity",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Self-Identity/dsh-client-ui-workspace-suite.git"
+  },
+  "homepage": "https://github.com/Self-Identity/dsh-client-ui-workspace-suite#readme",
+  "bugs": {
+    "url": "https://github.com/Self-Identity/dsh-client-ui-workspace-suite/issues"
+  },
   "type": "module",
   "engines": {
     "node": ">=22.19.0",

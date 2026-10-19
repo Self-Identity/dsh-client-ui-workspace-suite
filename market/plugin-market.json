@@ -11,10 +11,10 @@
       "name": "dsh-client-ui-workspace-suite",
       "title": "dsh-client-ui-workspace-suite",
       "description": "Workspace suite for the DSH Web client: an explorer-style picker (browse, inline folder creation, path input, enter-which-workspace chooser), a nested workspace tree with collapse-all and cascade delete, a per-workspace overview page (subtree token totals, expanded session tree, turn jumps, dependencies card, README), and a root-level conversation workspace menu.",
-      "homepage": "https://github.com/Yan-X-X/dsh-client-ui-workspace-suite",
+      "homepage": "https://github.com/Self-Identity/dsh-client-ui-workspace-suite",
       "repository": {
         "type": "git",
-        "url": "https://github.com/Yan-X-X/dsh-client-ui-workspace-suite"
+        "url": "https://github.com/Self-Identity/dsh-client-ui-workspace-suite"
       },
       "metadata": {
         "keywords": []
@@ -25,18 +25,11 @@
           "publishTimestamp": 1792400092,
           "source": {
             "type": "git",
-            "url": "https://github.com/Yan-X-X/dsh-client-ui-workspace-suite",
+            "url": "https://github.com/Self-Identity/dsh-client-ui-workspace-suite",
             "commit": "1b56c6c2a006ac7ddd0ebf4272433b4cb9034543"
           },
           "engines": {
             "dsh": ">=0.2.1-rc.2 <0.3.0"
-          }
-        },
-        {
-          "version": "1.2.0",
-          "publishTimestamp": 1792400092,
-          "source": {
-            "type": "npm"
           }
         }
       ]

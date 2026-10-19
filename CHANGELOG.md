@@ -4,14 +4,14 @@
 
 ## 1.2.0 — 2026-10-19
 
-首个**可对外发布**的版本（`1.1.0` 只在本机迭代、从未发布）。功能内容如下；本版额外补上了发布所需的工程与清单字段。
+首个对外发布版本。功能内容如下；本版同时补齐了发布所需的工程与清单字段。
 
 ### 发布工程
 
-- `package.json`：`private` 置为 `false`、新增 `engines.dsh`（`>=0.2.1-rc.2 <0.3.0`）、版本 1.1.0 → **1.2.0**；新增 `release:check` / `release:index` 脚本。
+- `package.json`：新增 `engines.dsh`（`>=0.2.1-rc.2 <0.3.0`）、版本 1.1.0 → **1.2.0**、`repository` / `homepage` / `bugs` / `author`；新增 `release:check` / `release:index` 脚本。
 - `tools/release.mjs`：发布前校验（包名/SemVer/`private`/`engines.dsh`/`bundle.patch` 存在/构建产物是否比 `src/` 旧/`files` 含 `lib`/README+LICENSE/图标 ≤24 KiB）+ 生成「插件市场索引 format 1」条目（git 精确 commit 与 npm 两种来源）。
 - `market/plugin-market.json`：可直接托管的索引（format 1），由 `--write` 合并维护旧版本条目。
-- `docs/PUBLISH.md`：换新 GitHub 账号的迁移、发版流程、索引托管、客户端添加索引、npm 发布与检查清单。
+- `docs/PUBLISH.md`：发版流程、索引托管、客户端添加索引、npm 发布与检查清单。
 
 这一版把「工作区」从平铺列表整理成可浏览、可总览、可选对入口的四件套，并修掉一批长期存在的交互缺陷。
 
@@ -28,7 +28,7 @@
 
 - **「未分组」改为独立分区**：列表末尾的未分组会话上方加一条主题**细分割线** + 小号小节标题（含数量徽标），不再画成一个像工作区、实际点不动、且蓝线易被读成选中态的行。
 - **总览页顺序与文案**：「依赖与环境」卡移到「工作区与会话」**下方**（页序变为 会话树 → 依赖与环境 → README）；右上角按钮「刷新统计」改为「**刷新**」；探测标签去掉括号说明（「顶层文件探测」）；**检测不到 `package.json` 时不再显示说明行**（整行隐藏，卡里只留目录与探测）。
-- **README 渲染改为插件自带的轻量 Markdown**（标题/列表/代码/表格/引用/分隔线/行内样式/链接；不注入 HTML、`javascript:` 链接不可点）。本机这版客户端没有出厂 `MarkdownText` 原语，之前退化成纯文本；设置页文案同步去掉「并按 GitHub 风格渲染」。
+- **README 渲染改为插件自带的轻量 Markdown**（标题/列表/代码/表格/引用/分隔线/行内样式/链接；不注入 HTML、`javascript:` 链接不可点）。目标客户端版本没有出厂 `MarkdownText` 原语，之前退化成纯文本；设置页文案同步去掉「并按 GitHub 风格渲染」。
 - **配置页开关按出厂规范重写**：36×20、2px 内缩、off 态用 `--dsw-alias-border-l3` 轨道 + `--dsw-alias-switch-thumb` 滑块、on 态 `--dsw-alias-brand-primary`、补 `:focus-visible` 焦点环——原来 off 态是近白轨道 + 白色滑块，在白卡上等于"消失"。
 - **总览页自己承担滚动，滚动条与左侧列表同宽**：`.dws-page` 同时给 `flex:1 1 auto` 与 `height:100%`——插槽外框是 auto basis 的 flex 列时 `height:100%` 会退化成 auto，整页被宿主面板滚走，显示的是宿主那条（默认 ~15px）；现在页面始终填满面板、`overflow:hidden`，滚动条由 `.dws-pageBody` 绘制并使用同一个 `--suite-scrollbar-width`（默认 8px）。
 - **README 卡底部留白**：渲染内容底部补 14px，最后一行不再贴住卡片下沿。
@@ -58,7 +58,6 @@
 ### 工程
 
 - 九项校验新增：hook 放置守卫、（选择规则）单元断言、缩进阶梯断言、选择弹窗 add 流程断言。
-- 目录迁移：`F:\DSH-Official\plugins\<包名>` → **`F:\DSH-Official-Plugins\<包名>`**（旧路径保留目录联接）；profile 依赖与启用列表同步指向新根。
 - 对齐宿主 **`@deepseek-ai/dsh-desktop-runtime 0.2.1-rc.1`**：重新解包 `app.asar` 核对种子词、插槽 id、组合行、原语、服务方法，未发现需要改代码的破坏性变更。
 
 ## 1.0.0 — 2026-10
