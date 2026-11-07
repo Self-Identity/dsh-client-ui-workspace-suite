@@ -72,18 +72,58 @@ const checkLossless = (label, value) => {
 }
 
 let definition = null
+const mountedPickers = []
+const fakeLoader = {
+  store: {},
+  async create(options) {
+    const id = 'dynamic-' + String(mountedPickers.length)
+    mountedPickers.push(options.name)
+    this.store[id] = { fiber: { await: () => Promise.resolve(), dispose: () => Promise.resolve() } }
+    return id
+  },
+  resolve(id) {
+    return this.store[id]
+  },
+  remove(id) {
+    delete this.store[id]
+  },
+}
 const ctx = {
   inject(deps, callback) {
-    if (!deps.includes('sessionProjections')) throw new Error('unexpected inject deps: ' + String(deps))
-    callback({ sessionProjections: { register: (def) => {
-      definition = def
-      return () => {}
-    } } })
+    if (deps.includes('sessionProjections')) {
+      callback({ sessionProjections: { register: (def) => {
+        definition = def
+        return () => {}
+      } } })
+      return
+    }
+    if (deps.includes('loader')) {
+      callback({
+        loader: fakeLoader,
+        get: () => undefined,
+        effect: (run) => run(),
+        logger: () => ({ warn: () => {} }),
+      })
+      return
+    }
+    throw new Error('unexpected inject deps: ' + String(deps))
   },
 }
 
 if (typeof plugin.apply !== 'function') problems.push('host half exports no apply function')
 else plugin.apply(ctx)
+
+// The pinned browse pair is mounted from the host half (the patch no longer
+// inserts it) and must mount in backend-then-surface order.
+await new Promise((resolve) => setTimeout(resolve, 10))
+if (mountedPickers.length !== 2) {
+  problems.push('expected the browse picker pair to be mounted, got ' + JSON.stringify(mountedPickers))
+} else {
+  check('pinned picker pair order', mountedPickers, [
+    '@deepseek-ai/dsh-host-directory-picker-browse',
+    '@deepseek-ai/dsh-client-ui-directory-picker-browse',
+  ])
+}
 
 if (definition === null) {
   problems.push('no projection was registered')

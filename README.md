@@ -75,7 +75,13 @@
 | 插槽（影子） | `sidebar.workspaces`（priority `-100`） | 替换整个工作区列表 |
 | 插槽（影子） | `conversation.hero.workspace`（priority `-1`） | 替换会话窗口的工作区菜单 |
 | 插槽（占位） | `sidebar.workspaces.directoryFlow`、`conversation.hero.workspace.directoryFlow` | 两个添加工作区弹窗位 |
-| 组合行 | 禁用 `directory-picker`，插入 browse 后端、它的 UI 与本包 | 见下 |
+| 组合行 | 禁用 `directory-picker`；browse 后端与其 UI 由本包 host 半区在服务空闲后挂载 | 见下 |
+
+### 选择器后端是怎么固定的
+
+出厂的 `directory-picker` 行是**自适应选择器**（`dsh-host-directory-picker-auto`）：它在启动时判定宿主处境，再把匹配的后端（这里在 Windows 上是 native）和它的浏览器表面作为**动态 Loader 条目**挂进内存根树。因此固定 `browse` 的做法是：本组合包先禁用该行，再由本包的 host 半区（`lib/index.js`）在 `ctx.directoryPicker` 服务空闲后，按同一机制把 browse 后端与 browse 表面挂载为动态条目。
+
+两者不能在补丁里各自写一行：热启用组合包时，加载器会同时创建新行并停用选择器行，而 native 后端的卸载是异步的——静态插入的 browse 行会在它卸载完成前注册同名 `directoryPicker` 服务，报 `service "directoryPicker" has been registered at <NativeDirectoryPicker>`（0.2.2-rc.1 上实测）。改为「等服务空闲后再挂载」后，冷启动与在运行中的客户端里热启用都能正常挂载；禁用组合包时先卸载这一对，再恢复自适应选择器。
 
 ### 全局副作用：系统目录对话框消失
 
@@ -98,7 +104,7 @@
 ## 安装
 
 1. 客户端侧边栏 → **插件** → **添加插件**。
-2. 填 `dsh-client-ui-workspace-suite@1.2.0`（或选择本地源码目录）。
+2. 填 `dsh-client-ui-workspace-suite@1.2.1`（或选择本地源码目录）。
 3. **安装** → **立即启用**；若提示「改动在下次启动生效」，重启客户端。
 4. 卡片显示 **已启用 / 已挂载**，工作区列表切换为树状视图。
 
@@ -106,16 +112,18 @@
 
 ## 兼容性
 
-已针对 `@deepseek-ai/dsh-desktop-runtime 0.2.1-rc.2` 验证：
+已针对 `@deepseek-ai/dsh-desktop-runtime 0.2.2-rc.1` 验证（历史的 0.2.1-rc.2 契约仍兼容）：
 
 | 契约 | 状态 |
 |---|---|
 | 平台种子 `react`、`@deepseek-ai/dsh-client-store`、`@deepseek-ai/dsh-client-ui-primitives` | 存在 |
 | 插槽 `sidebar.workspaces`、`sidebar.workspaces.directoryFlow`、`conversation.hero.workspace`、`conversation.hero.workspace.directoryFlow` | 存在 |
-| 组合行 `directory-picker`（`@deepseek-ai/dsh-host-directory-picker-auto`） | 存在；可禁用并由 browse 后端替换 |
+| 组合行 `directory-picker`（`@deepseek-ai/dsh-host-directory-picker-auto`） | 存在；禁用后由本包 host 半区挂载 `dsh-host-directory-picker-browse` 与 `dsh-client-ui-directory-picker-browse` |
+| 目录选择 seam `@deepseek-ai/dsh-host-directory-picker`（`ctx.directoryPicker` 服务基类） | 0.2.2 起后端以子类注册；host 半区按服务空闲状态挂载，不直接注册服务 |
 | `workspace-files` 行（`remote.workspaceFiles`） | 存在；README 卡与依赖卡使用 |
 | 原语 `Menu` / `MenuItemButton` / `Modal` / `HoverCard` / `MarkdownText` / `Tooltip` 及图标 | 存在；缺失时回退到内置渲染 |
 | 服务 `slots` / `locale` / `sessions` / `workspaces` / `uiWorkspace` / `layout` / `remote` | 存在；每次调用都经过容错包装 |
+| `directoryPicker` 服务与 `plugins.bundle.config` / `plugins.row.config` 插槽 | 存在；启用/禁用组合包均可热生效（无需重启） |
 
 客户端升级后，先重新构建并跑测试，再判断契约是否仍然有效。
 
@@ -131,6 +139,8 @@
 | `factory-failed` / `entry-inert` | 浏览器半区加载失败；插件退化为空操作 |
 
 常见原因：客户端没重启；`dsh.profile.bundles` 里没有本包；其他插件影子注册了同一插槽；客户端升级移动了路径。
+
+> 若插件页仍显示 1.2.0 时代的旧失败：`(@deepseek-ai/dsh-host-directory-picker-browse): Error: service "directoryPicker" has been registered at <NativeDirectoryPicker>`，说明那次热启用撞上了旧实现的两后端竞态。1.2.1 已改为等服务空闲后再挂载；升级到 1.2.1 后重启客户端一次即可清掉该失败状态。
 
 ## 开发
 

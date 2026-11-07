@@ -18,9 +18,9 @@ node tools/release.mjs --check
 2. Commit, then tag the release commit:
 
 ```powershell
-git tag -a v1.2.0 -m "dsh-client-ui-workspace-suite 1.2.0"
+git tag -a v<version> -m "dsh-client-ui-workspace-suite <version>"
 git push origin master
-git push origin v1.2.0
+git push origin v<version>
 ```
 
 Keep tags annotated and never move a tag that was already pushed; publish a new version instead.

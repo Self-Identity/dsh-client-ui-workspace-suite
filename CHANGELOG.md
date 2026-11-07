@@ -2,6 +2,24 @@
 
 本项目遵循语义化版本；每个版本对应 `package.json` 的 `version`。
 
+## 1.2.1 — 2026-11-07
+
+适配 `@deepseek-ai/dsh-desktop-runtime 0.2.2-rc.1`：修复在运行中的客户端里启用本组合包时报
+`(@deepseek-ai/dsh-host-directory-picker-browse): Error: service "directoryPicker" has been registered at <NativeDirectoryPicker>` 的问题。
+
+### 修复
+
+- **热启用失败（0.2.2 起）**：0.2.2 的 `directory-picker` 行改为自适应选择器（`dsh-host-directory-picker-auto`），它把 native 后端与表面作为**动态 Loader 条目**挂载，卸载是异步的。原实现把 browse 后端、browse 表面作为静态组合行插入；热启用时加载器同时创建新行并停用选择器行，browse 行抢在 native 卸载完成前注册同名 `ctx.directoryPicker`，于是启用被记为失败。
+  现在 `cordis.patch.yml` 只保留「禁用 `directory-picker` + 插入本包一行」，browse 后端与 browse 表面改由本包 host 半区（`lib/index.js`）在 `ctx.directoryPicker` 服务空闲后用 `ctx.loader.create` 挂载——与出厂选择器挂载后端是同一机制。冷启动与热启用都不再撞车；挂载顺序为「后端 → 表面」，失败时回滚并降级（插件仍启用，列目录能力不可用）。
+- **禁用/卸载时宿主崩溃**：0.2.2 在 effect 清理阶段读取已失效注入上下文里的 `loader` 服务会抛 `cannot get required service "loader" in inactive context`（实测会让 `dsh` 整体 fatal load failure）。现在挂载前先捕获服务引用与清理函数，禁用组合包可干净卸载，并恢复出厂的自适应选择器（系统目录对话框回归）。
+- **兼容性声明**：README 的兼容表由 0.2.1-rc.2 更新为 0.2.2-rc.1，并补充目录选择 seam 在 0.2.2 的「后端子类 + 动态挂载」机制说明；排查章节补上旧版热启用失败的状态清理步骤。
+
+### 工程
+
+- `tools/test-host.mjs`：假上下文支持 `loader` 注入，并断言 browse 对按「`dsh-host-directory-picker-browse` → `dsh-client-ui-directory-picker-browse`」顺序挂载。
+- `tools/test-manifest.mjs`：改为校验 host 半区确实通过 `loader.create` 挂载 browse 对，并禁止把 browse 后端重新写成静态组合行。
+- 全量测试通过：manifest / styles / host / util / i18n / smoke；0.2.2-rc.1 真实运行时上验证了「带包冷启动」「无包启动后热启用」「启用后热禁用」三条路径的客户端模块名单。
+
 ## 1.2.0 — 2026-10-19
 
 首个对外发布版本。功能内容如下；本版同时补齐了发布所需的工程与清单字段。

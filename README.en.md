@@ -75,7 +75,13 @@ The scrollbar width chain is `--suite-scrollbar-width` → the global `--dsh-scr
 | Slot (shadow) | `sidebar.workspaces` (priority `-100`) | Replaces the whole workspace list |
 | Slot (shadow) | `conversation.hero.workspace` (priority `-1`) | Replaces the conversation workspace menu |
 | Slot (placeholder) | `sidebar.workspaces.directoryFlow`, `conversation.hero.workspace.directoryFlow` | The two add-workspace dialog seats |
-| Composition row | `directory-picker` disabled; inserts the browse backend, its UI and this package | See below |
+| Composition row | `directory-picker` disabled; this package's host half mounts the browse backend and its UI once the seam is free | See below |
+
+### How the picker backend is pinned
+
+The shipped `directory-picker` row is the **adaptive chooser** (`dsh-host-directory-picker-auto`): at boot it samples the host situation and mounts the matching backend (native on Windows here) plus its browser surface as **dynamic Loader entries** in the in-memory root tree. Pinning `browse` therefore means: this bundle disables that row, and its own host half (`lib/index.js`) mounts the browse backend and browse surface the same way, once `ctx.directoryPicker` is unregistered.
+
+The pair cannot be two static patch rows: on a live enable the loader creates the new rows and disables the chooser row in the same update, while the native backend's unregistration is asynchronous — a statically inserted browse row would register the same `directoryPicker` service before that finishes and fail with `service "directoryPicker" has been registered at <NativeDirectoryPicker>` (observed on 0.2.2-rc.1). Mounting after the seam is free keeps both a cold boot and a live enable green; disabling the bundle unmounts the pair first and restores the adaptive chooser.
 
 ### Global side effect: the native directory dialog disappears
 
@@ -98,7 +104,7 @@ The directory-picker service is mutually exclusive: the `native` backend offers 
 ## Install
 
 1. Client sidebar → **Plugins** → **Add plugin**.
-2. Enter `dsh-client-ui-workspace-suite@1.2.0` (or choose the local source directory).
+2. Enter `dsh-client-ui-workspace-suite@1.2.1` (or choose the local source directory).
 3. **Install** → **Enable now**; restart the client if it says the change takes effect on the next start.
 4. The card must read **Enabled / Mounted**. The workspace list then switches to the tree view.
 
@@ -106,16 +112,18 @@ Enabling the bundle disables the shipped `directory-picker` row (see Boundaries)
 
 ## Compatibility
 
-Verified against `@deepseek-ai/dsh-desktop-runtime 0.2.1-rc.2`:
+Verified against `@deepseek-ai/dsh-desktop-runtime 0.2.2-rc.1` (the 0.2.1-rc.2 contracts remain compatible):
 
 | Contract | Status |
 |---|---|
 | Platform seeds `react`, `@deepseek-ai/dsh-client-store`, `@deepseek-ai/dsh-client-ui-primitives` | Present |
 | Slots `sidebar.workspaces`, `sidebar.workspaces.directoryFlow`, `conversation.hero.workspace`, `conversation.hero.workspace.directoryFlow` | Present |
-| Composition row `directory-picker` (`@deepseek-ai/dsh-host-directory-picker-auto`) | Present; can be disabled and replaced by the browse backend |
+| Composition row `directory-picker` (`@deepseek-ai/dsh-host-directory-picker-auto`) | Present; once disabled, this package's host half mounts `dsh-host-directory-picker-browse` and `dsh-client-ui-directory-picker-browse` |
+| Directory-picker seam `@deepseek-ai/dsh-host-directory-picker` (`ctx.directoryPicker` service base) | Since 0.2.2 backends register as subclasses; the host half mounts by seam availability instead of registering the service itself |
 | `workspace-files` row (`remote.workspaceFiles`) | Present; used by the README card and dependencies card |
 | Primitives `Menu` / `MenuItemButton` / `Modal` / `HoverCard` / `MarkdownText` / `Tooltip` and the icons | Present; missing primitives fall back to built-in renderers |
 | Services `slots` / `locale` / `sessions` / `workspaces` / `uiWorkspace` / `layout` / `remote` | Present; every call goes through a tolerant wrapper |
+| `directoryPicker` service and `plugins.bundle.config` / `plugins.row.config` slots | Present; enabling and disabling the bundle both apply live, without a restart |
 
 After a client upgrade, rebuild and run the test suite before assuming a contract is still valid.
 
@@ -131,6 +139,8 @@ The browser half writes its boot progress into `localStorage` under `dsh-workspa
 | `factory-failed` / `entry-inert` | The browser half failed to load; the plugin degrades to a no-op |
 
 Common causes: the client was not restarted; the package is missing from `dsh.profile.bundles`; another plugin shadows the same slot; the client upgrade moved a path.
+
+> If the Plugins page still shows the 1.2.0-era failure `(@deepseek-ai/dsh-host-directory-picker-browse): Error: service "directoryPicker" has been registered at <NativeDirectoryPicker>`, that was a live enable racing the old static pair. 1.2.1 mounts the pair only after the seam is free; upgrade to 1.2.1 and restart the client once to clear the stale failure state.
 
 ## Development
 

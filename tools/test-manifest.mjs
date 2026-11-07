@@ -108,11 +108,21 @@ if (typeof patchPath !== 'string' || !exists(patchPath)) {
   if (!/id:\s*directory-picker[\s\S]{0,40}?disabled:\s*true/.test(patch)) {
     fail('the patch does not pin the directory picker to a backend that implements list(): the explorer would have no enumeration')
   }
-  if (!patch.includes('dsh-host-directory-picker-browse')) {
-    fail('the patch does not compose the browse directory-picker backend')
+  // The browse pair is mounted from the host half rather than inserted as rows:
+  // the chooser's dynamic native backend unregisters asynchronously during a live
+  // enable, so a static pair would race it and fail with a duplicate service.
+  const pickerHost = typeof hostExport === 'string' && exists(hostExport) ? read(hostExport) : ''
+  if (!pickerHost.includes("'@deepseek-ai/dsh-host-directory-picker-browse'")) {
+    fail('the host half does not mount the browse directory-picker backend')
   }
-  if (!patch.includes('dsh-client-ui-directory-picker-browse')) {
-    fail('the patch does not compose the shipped browse surface as the fallback when the picker module is off')
+  if (!pickerHost.includes("'@deepseek-ai/dsh-client-ui-directory-picker-browse'")) {
+    fail('the host half does not mount the shipped browse surface as the fallback when the picker module is off')
+  }
+  if (!/loader\.create\(/.test(pickerHost)) {
+    fail('the host half does not mount the browse pair through the Loader')
+  }
+  if (patch.includes('id: workspace-suite-directory-picker-browse')) {
+    fail('the patch still inserts the browse backend statically; a live enable would race the native backend')
   }
 }
 
