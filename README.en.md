@@ -7,7 +7,27 @@
 
 Workspace suite for the DSH Web client: an explorer-style picker, a nested workspace tree, a per-workspace overview page, and a root-level conversation workspace menu.
 
-> Target host: `@deepseek-ai/dsh-desktop-runtime 0.2.1-rc.2` · renderer-only bundle (no host tools, no network requests)
+> Target host: `@deepseek-ai/dsh-desktop-runtime 0.2.2-rc.1` · renderer-only bundle (no host tools, no network requests)
+
+## Screenshots
+
+### Multi-level workspace list
+
+Workspaces nest by directory hierarchy; sessions and sub-workspaces form one tree, each row shows its latest activity time, and one control collapses every sub-workspace.
+
+![Multi-level workspace list](https://raw.githubusercontent.com/Self-Identity/dsh-client-ui-workspace-suite/master/src/assets/workplace-list-view.png)
+
+### Workspace picker
+
+An explorer-style picker: browse level by level, create a sub-folder inline, type a path, check a hierarchy, then choose which workspace to enter.
+
+![Workspace picker](https://raw.githubusercontent.com/Self-Identity/dsh-client-ui-workspace-suite/master/src/assets/workplace-select-window-view.png)
+
+### Workspace overview page
+
+One workspace's overview: subtree token totals with a per-model split, the fully expanded session tree, turn jumps, the dependencies/environment card and the README.
+
+![Workspace overview page](https://raw.githubusercontent.com/Self-Identity/dsh-client-ui-workspace-suite/master/src/assets/workplace-overview-page-view.png)
 
 ## Modules
 

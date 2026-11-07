@@ -19,6 +19,11 @@
 - `tools/test-host.mjs`：假上下文支持 `loader` 注入，并断言 browse 对按「`dsh-host-directory-picker-browse` → `dsh-client-ui-directory-picker-browse`」顺序挂载。
 - `tools/test-manifest.mjs`：改为校验 host 半区确实通过 `loader.create` 挂载 browse 对，并禁止把 browse 后端重新写成静态组合行。
 - 全量测试通过：manifest / styles / host / util / i18n / smoke；0.2.2-rc.1 真实运行时上验证了「带包冷启动」「无包启动后热启用」「启用后热禁用」三条路径的客户端模块名单。
+- `tools/release.mjs`：构建产物新鲜度校验只比较 `src/*.js` 构建输入，`src/assets` 下的截图等非构建文件不再触发「`lib/client.js` 比 src 旧」的误报。
+
+### 文档
+
+- README（中/英）新增「效果展示 / Screenshots」：多级工作区列表、工作区选择窗口、工作区总览页三张实机截图（`src/assets/`，使用 GitHub raw 绝对地址，npm 页面同样可显示）。
 
 ## 1.2.0 — 2026-10-19
 

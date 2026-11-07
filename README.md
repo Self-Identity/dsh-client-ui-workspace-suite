@@ -7,7 +7,27 @@
 
 把 DSH 客户端的「工作区」从一层平铺列表，升级成可浏览的目录树：选目录、看层级、看总览、开会话时选对工作区。
 
-> 目标宿主：`@deepseek-ai/dsh-desktop-runtime 0.2.1-rc.2` · 纯渲染层组合包（无 Host 工具、无网络请求）
+> 目标宿主：`@deepseek-ai/dsh-desktop-runtime 0.2.2-rc.1` · 纯渲染层组合包（无 Host 工具、无网络请求）
+
+## 效果展示
+
+### 多级工作区列表
+
+工作区按目录层级嵌套，会话与子工作区共同成树；每行显示最近活动时间，可一键折叠全部子工作区。
+
+![多级工作区列表视图](https://raw.githubusercontent.com/Self-Identity/dsh-client-ui-workspace-suite/master/src/assets/workplace-list-view.png)
+
+### 工作区选择窗口
+
+资源管理器式选择弹窗：逐级浏览、行内新建文件夹、输入路径、按层级勾选，提交后选择进入哪个工作区。
+
+![工作区选择窗口视图](https://raw.githubusercontent.com/Self-Identity/dsh-client-ui-workspace-suite/master/src/assets/workplace-select-window-view.png)
+
+### 工作区总览页
+
+进入任一工作区的总览：子树 Token 总量与按模型明细、完全展开的会话树、轮次跳转、依赖与环境卡、README。
+
+![工作区总览页视图](https://raw.githubusercontent.com/Self-Identity/dsh-client-ui-workspace-suite/master/src/assets/workplace-overview-page-view.png)
 
 ## 模块
 

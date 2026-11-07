@@ -87,20 +87,17 @@ if (iconPath !== undefined) {
   }
 }
 
-// The build output must not be older than the newest source file.
-const newest = (dir, skip) => {
-  let latest = 0
-  for (const name of readdirSync(dir, { withFileTypes: true })) {
-    const full = join(dir, name.name)
-    if (skip.some((ignored) => full.includes(ignored))) continue
-    const stamp = name.isDirectory() ? newest(full, skip) : statSync(full).mtimeMs
-    if (stamp > latest) latest = stamp
-  }
-  return latest
-}
+// The build output must not be older than the newest build input: the top-level
+// src/*.js parts tools/build.mjs concatenates. Screenshots and other files kept
+// under src/assets do not feed the build, so they must not fail this check.
 const sourceDir = join(root, 'src')
 if (existsSync(sourceDir) && existsSync(join(root, 'lib/client.js'))) {
-  const sourceTime = newest(sourceDir, [])
+  let sourceTime = 0
+  for (const name of readdirSync(sourceDir)) {
+    if (!name.endsWith('.js')) continue
+    const stamp = statSync(join(sourceDir, name)).mtimeMs
+    if (stamp > sourceTime) sourceTime = stamp
+  }
   const bundleTime = statSync(join(root, 'lib/client.js')).mtimeMs
   if (sourceTime > bundleTime) {
     fail('lib/client.js is older than src/; run `node tools/build.mjs` and commit the result')
