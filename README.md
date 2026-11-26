@@ -7,7 +7,7 @@
 
 把 DSH 客户端的「工作区」从一层平铺列表，升级成可浏览的目录树：选目录、看层级、看总览、开会话时选对工作区。
 
-> 目标宿主：`@deepseek-ai/dsh-desktop-runtime 0.2.2-rc.1` · 纯渲染层组合包（无 Host 工具、无网络请求）
+> 目标宿主：`@deepseek-ai/dsh-desktop-runtime 0.2.2-rc.5` · 纯渲染层组合包（无 Host 工具、无网络请求）
 
 ## 效果展示
 
@@ -124,7 +124,7 @@
 ## 安装
 
 1. 客户端侧边栏 → **插件** → **添加插件**。
-2. 填 `dsh-client-ui-workspace-suite@1.2.1`（或选择本地源码目录）。
+2. 填 `dsh-client-ui-workspace-suite@1.2.2`（或选择本地源码目录）。
 3. **安装** → **立即启用**；若提示「改动在下次启动生效」，重启客户端。
 4. 卡片显示 **已启用 / 已挂载**，工作区列表切换为树状视图。
 
@@ -132,7 +132,7 @@
 
 ## 兼容性
 
-已针对 `@deepseek-ai/dsh-desktop-runtime 0.2.2-rc.1` 验证（历史的 0.2.1-rc.2 契约仍兼容）：
+已针对 `@deepseek-ai/dsh-desktop-runtime 0.2.2-rc.5` 验证（历史的 0.2.1-rc.2 契约仍兼容）：
 
 | 契约 | 状态 |
 |---|---|
@@ -141,7 +141,7 @@
 | 组合行 `directory-picker`（`@deepseek-ai/dsh-host-directory-picker-auto`） | 存在；禁用后由本包 host 半区挂载 `dsh-host-directory-picker-browse` 与 `dsh-client-ui-directory-picker-browse` |
 | 目录选择 seam `@deepseek-ai/dsh-host-directory-picker`（`ctx.directoryPicker` 服务基类） | 0.2.2 起后端以子类注册；host 半区按服务空闲状态挂载，不直接注册服务 |
 | `workspace-files` 行（`remote.workspaceFiles`） | 存在；README 卡与依赖卡使用 |
-| 原语 `Menu` / `MenuItemButton` / `Modal` / `HoverCard` / `MarkdownText` / `Tooltip` 及图标 | 存在；缺失时回退到内置渲染 |
+| 原语 `Menu`（portal 弹层）/ `MenuItemButton` / `Modal` / `HoverCard` / `MarkdownText` / `Tooltip` 及图标 | 存在；缺失时回退到内置渲染。0.2.2 起 `Menu` 改用 CSS 锚点定位（`anchorRef` / `anchorPoint`，旧 `getAnchorRect` 已移除） |
 | 服务 `slots` / `locale` / `sessions` / `workspaces` / `uiWorkspace` / `layout` / `remote` | 存在；每次调用都经过容错包装 |
 | `directoryPicker` 服务与 `plugins.bundle.config` / `plugins.row.config` 插槽 | 存在；启用/禁用组合包均可热生效（无需重启） |
 
@@ -161,6 +161,8 @@
 常见原因：客户端没重启；`dsh.profile.bundles` 里没有本包；其他插件影子注册了同一插槽；客户端升级移动了路径。
 
 > 若插件页仍显示 1.2.0 时代的旧失败：`(@deepseek-ai/dsh-host-directory-picker-browse): Error: service "directoryPicker" has been registered at <NativeDirectoryPicker>`，说明那次热启用撞上了旧实现的两后端竞态。1.2.1 已改为等服务空闲后再挂载；升级到 1.2.1 后重启客户端一次即可清掉该失败状态。
+>
+> 若菜单出现在窗口右下角：说明 portal 菜单没有拿到锚点。0.2.2 起宿主 `Menu` 用 `anchorRef` 做 CSS 锚点定位，旧的 `getAnchorRect` 会被静默忽略；1.2.2 起所有行菜单与窗口工作区菜单都传入锚点 ref，不再回退到窗口角落。
 
 ## 开发
 

@@ -7,7 +7,7 @@
 
 Workspace suite for the DSH Web client: an explorer-style picker, a nested workspace tree, a per-workspace overview page, and a root-level conversation workspace menu.
 
-> Target host: `@deepseek-ai/dsh-desktop-runtime 0.2.2-rc.1` · renderer-only bundle (no host tools, no network requests)
+> Target host: `@deepseek-ai/dsh-desktop-runtime 0.2.2-rc.5` · renderer-only bundle (no host tools, no network requests)
 
 ## Screenshots
 
@@ -124,7 +124,7 @@ The directory-picker service is mutually exclusive: the `native` backend offers 
 ## Install
 
 1. Client sidebar → **Plugins** → **Add plugin**.
-2. Enter `dsh-client-ui-workspace-suite@1.2.1` (or choose the local source directory).
+2. Enter `dsh-client-ui-workspace-suite@1.2.2` (or choose the local source directory).
 3. **Install** → **Enable now**; restart the client if it says the change takes effect on the next start.
 4. The card must read **Enabled / Mounted**. The workspace list then switches to the tree view.
 
@@ -132,7 +132,7 @@ Enabling the bundle disables the shipped `directory-picker` row (see Boundaries)
 
 ## Compatibility
 
-Verified against `@deepseek-ai/dsh-desktop-runtime 0.2.2-rc.1` (the 0.2.1-rc.2 contracts remain compatible):
+Verified against `@deepseek-ai/dsh-desktop-runtime 0.2.2-rc.5` (the 0.2.1-rc.2 contracts remain compatible):
 
 | Contract | Status |
 |---|---|
@@ -141,7 +141,7 @@ Verified against `@deepseek-ai/dsh-desktop-runtime 0.2.2-rc.1` (the 0.2.1-rc.2 c
 | Composition row `directory-picker` (`@deepseek-ai/dsh-host-directory-picker-auto`) | Present; once disabled, this package's host half mounts `dsh-host-directory-picker-browse` and `dsh-client-ui-directory-picker-browse` |
 | Directory-picker seam `@deepseek-ai/dsh-host-directory-picker` (`ctx.directoryPicker` service base) | Since 0.2.2 backends register as subclasses; the host half mounts by seam availability instead of registering the service itself |
 | `workspace-files` row (`remote.workspaceFiles`) | Present; used by the README card and dependencies card |
-| Primitives `Menu` / `MenuItemButton` / `Modal` / `HoverCard` / `MarkdownText` / `Tooltip` and the icons | Present; missing primitives fall back to built-in renderers |
+| Primitives `Menu` (portaled lists) / `MenuItemButton` / `Modal` / `HoverCard` / `MarkdownText` / `Tooltip` and the icons | Present; missing primitives fall back to built-in renderers. Since 0.2.2 `Menu` positions with CSS anchor positioning (`anchorRef` / `anchorPoint`; the old `getAnchorRect` was removed) |
 | Services `slots` / `locale` / `sessions` / `workspaces` / `uiWorkspace` / `layout` / `remote` | Present; every call goes through a tolerant wrapper |
 | `directoryPicker` service and `plugins.bundle.config` / `plugins.row.config` slots | Present; enabling and disabling the bundle both apply live, without a restart |
 
@@ -161,6 +161,8 @@ The browser half writes its boot progress into `localStorage` under `dsh-workspa
 Common causes: the client was not restarted; the package is missing from `dsh.profile.bundles`; another plugin shadows the same slot; the client upgrade moved a path.
 
 > If the Plugins page still shows the 1.2.0-era failure `(@deepseek-ai/dsh-host-directory-picker-browse): Error: service "directoryPicker" has been registered at <NativeDirectoryPicker>`, that was a live enable racing the old static pair. 1.2.1 mounts the pair only after the seam is free; upgrade to 1.2.1 and restart the client once to clear the stale failure state.
+>
+> If a menu appears in the window's bottom-right corner, the portaled list lost its anchor: since 0.2.2 the host `Menu` anchors through `anchorRef` (the old `getAnchorRect` is silently ignored). 1.2.2 passes an anchor ref from every row menu and from the conversation workspace menu, so the list no longer falls back to the window corner.
 
 ## Development
 

@@ -2,6 +2,20 @@
 
 本项目遵循语义化版本；每个版本对应 `package.json` 的 `version`。
 
+## 1.2.2 — 2026-11-27
+
+适配 `@deepseek-ai/dsh-desktop-runtime 0.2.2-rc.5` 的 Client UI 原语变更，修复「更多」菜单定位漂移。
+
+### 修复
+
+- **点击行菜单里的功能后，菜单异常跳到窗口右下角**：DSH 0.2.2 起 `@deepseek-ai/dsh-client-ui-primitives` 的 `Menu` 移除了 `getAnchorRect` 定位回调，改为 CSS 锚点定位（外部触发元素用 `anchorRef`，按坐标打开用 `anchorPoint`）。旧回调被静默忽略，portal 菜单失去锚点后按 CSS 回退到窗口右下角（`bottom:12px; right:12px`）。
+  工作区行、会话行与总览页行的「更多」菜单现在把触发按钮的 ref 作为 `anchorRef` 传给宿主 `Menu`（与官方「复制 JSON」菜单同一写法：内联 `anchor` 元素 + `anchorRef`）；会话窗口的工作区菜单把 slot owner 提供的 `anchorRef` 直接传给 `Menu`（owner 缺失时退回空 ref，菜单保持隐藏，而不是跑到窗口角落）。插件自带的回退菜单仍用点击时测得的 rect 自行定位。
+- **回归测试**：`tools/smoke.mjs` 的菜单定位断言从「每个 host Menu 都带 `getAnchorRect`」改为「每个 host Menu 都带 `anchorRef`」，并新增「不得再传已移除的 `getAnchorRect`」检查（当前 43 个 host Menu 全部通过）。
+
+### 文档
+
+- README（中/英）：兼容基线更新到 `0.2.2-rc.5`，补充 `Menu` 的 CSS 锚点契约与「菜单跑到右下角」的排查说明；安装示例版本更新到 1.2.2。
+
 ## 1.2.1 — 2026-11-07
 
 适配 `@deepseek-ai/dsh-desktop-runtime 0.2.2-rc.1`：修复在运行中的客户端里启用本组合包时报

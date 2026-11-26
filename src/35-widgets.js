@@ -332,29 +332,27 @@
      * throws inside the tree and would blank the whole list. This builds the
      * trigger as an element, keeps the host menu behind a boundary that falls
      * back to the plugin's own list, and never renders the trigger twice.
+     *
+     * Positioning follows the host's CSS-anchor contract: `anchorRef` points at
+     * the trigger element so the portaled list is anchored to it. The old
+     * `getAnchorRect` prop was removed from the primitive — passing it is ignored,
+     * and the portaled list then falls back to the window's bottom-right corner.
+     * The measured `rect` is kept only for the plugin's own fallback menu.
      */
     function RowMenu({ label, items, onSelect, footer, side, disabled, iconName, menuLabel, triggerLabel, triggerIcon }) {
       const [open, setOpen] = React.useState(false)
       const [rect, setRect] = React.useState(null)
       const [hostMenuFailed, setHostMenuFailed] = React.useState(false)
       const triggerRef = React.useRef(null)
-      // The portaled host list is positioned from this rect. It is captured from the
-      // click itself rather than read off a ref: the host may re-clone the anchor
-      // element, which replaces any ref this plugin attached, and without a rect the
-      // list opens unpositioned in the window's top-left corner.
-      const anchorRectRef = React.useRef(null)
       const onClick = React.useCallback((event) => {
         event.preventDefault()
         event.stopPropagation()
         const node = event.currentTarget
         if (node !== null && node !== undefined && typeof node.getBoundingClientRect === 'function') {
-          const measured = node.getBoundingClientRect()
-          anchorRectRef.current = measured
-          setRect(measured)
+          setRect(node.getBoundingClientRect())
         }
         setOpen((value) => !value)
       }, [])
-      const getAnchorRect = React.useCallback(() => anchorRectRef.current, [])
       // The trigger element is memoized: handing the host menu a brand-new element
       // on every render makes it re-anchor and re-run its focus handoff mid-click,
       // which is what swallowed the first selection.
@@ -420,9 +418,11 @@
         side: side === 'top' ? 'top' : 'bottom',
         align: 'start',
         anchor: trigger,
-        // Portal mode places the list from the anchor rect the owner supplies; with
-        // no rect the host list renders unpinned at the window's origin.
-        getAnchorRect,
+        // Portal mode anchors the list with CSS anchor positioning: the host marks
+        // this trigger element with a generated `anchor-name`, and the portaled
+        // list follows it through `position-anchor`. Without `anchorRef` the list
+        // has no anchor and falls back to the window's bottom-right corner.
+        anchorRef: triggerRef,
         items: rows === undefined ? items : [],
         onSelect: choose,
         ...(footer === undefined ? {} : { footer }),

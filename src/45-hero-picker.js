@@ -32,6 +32,10 @@
       const [chooser, setChooser] = React.useState(null)
       const [choice, setChoice] = React.useState(null)
       const [chosenItem, setChosenItem] = React.useState(null)
+      // The host `Menu` anchors its portaled list by CSS anchor positioning from
+      // `anchorRef`; the owner may omit that ref, and a menu with no anchor must
+      // stay hidden rather than open in the window corner.
+      const absentAnchor = React.useRef(null)
 
       const isRoot = (item) => !items.some((other) => other !== item && isAncestorPath(other.path, item.path))
       const roots = items.filter(isRoot)
@@ -139,23 +143,20 @@
       })
 
       return E(React.Fragment, null,
-        // Positioned from the anchor element's rect: portal mode leaves the list
-        // unpinned (top-left corner) without it.
+        // The portaled list is anchored through CSS anchor positioning: `anchorRef`
+        // points at the hero button that opened it. The old `getAnchorRect` prop no
+        // longer exists in the primitive, so passing it would leave the list
+        // unanchored in the window's bottom-right corner.
         hasPrimitive('Menu') ? E(ui.Menu, {
           open: open === true && !flowOpen && chooser === null && (defs.length > 0 || flowAvailable),
           anchor: null,
+          anchorRef: props.anchorRef === undefined || props.anchorRef === null ? absentAnchor : props.anchorRef,
           items: rows === undefined ? defs : [],
           selectedId,
           onSelect: handleSelect,
           onClose,
           side: 'bottom',
           portal: true,
-          getAnchorRect: () => {
-            const node = props.anchorRef === undefined || props.anchorRef === null ? null : props.anchorRef.current
-            return node === null || node === undefined || typeof node.getBoundingClientRect !== 'function'
-              ? null
-              : node.getBoundingClientRect()
-          },
         }, menuChildren) : null,
         // Prefer the declared child hole (that is the sanctioned path); fall back to
         // rendering the picker directly, because a shadowing registration may not be

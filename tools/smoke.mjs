@@ -1224,23 +1224,27 @@ if (problems.length === 0) {
 
 /* --------------------------- menu placement ------------------------------- */
 
-// A portaled host list is placed from the anchor rect its owner supplies. Without
-// one the list renders unpinned at the window's origin (reported in the client as
-// "the menu flew to the top-left corner").
+// A portaled host list follows its CSS anchor: the primitive marks the element
+// behind `anchorRef` with a generated `anchor-name` and positions the list from
+// it. The old `getAnchorRect` prop was removed from the primitive, so a menu
+// that still passes it opens unanchored in the window's bottom-right corner.
 {
   const placements = menuProps.filter((props) => props !== null && typeof props === 'object')
   if (placements.length === 0) fail('no host Menu received props at all')
   else {
-    const missing = placements.filter((props) => typeof props.getAnchorRect !== 'function')
+    const missing = placements.filter((props) => props.anchorRef === undefined || props.anchorRef === null
+      || typeof props.anchorRef !== 'object' || !('current' in props.anchorRef))
     if (missing.length > 0) {
-      fail(missing.length + ' of ' + placements.length + ' host menus got no getAnchorRect')
+      fail(missing.length + ' of ' + placements.length + ' host menus got no anchorRef (the portaled list would open in the window corner)')
     } else {
-      console.log('menu placement: ' + String(placements.length) + ' host menu(s) supply an anchor rect')
+      console.log('menu placement: ' + String(placements.length) + ' host menu(s) supply an anchorRef')
     }
+    const legacy = placements.filter((props) => typeof props.getAnchorRect === 'function')
+    if (legacy.length > 0) fail('a host menu still passes the removed getAnchorRect prop')
     const badSide = placements.filter((props) => props.side !== 'bottom' && props.side !== 'top')
     if (badSide.length > 0) fail('a host menu received an unsupported side: ' + JSON.stringify(badSide[0].side))
-    // `anchor: null` is legitimate when a rect is supplied (the shipped hero picker
-    // positions that way); anything else non-element is not.
+    // `anchor: null` is legitimate when the trigger element is external and supplied
+    // through `anchorRef`; anything else non-element is not.
     const domAnchor = placements.filter((props) => props.anchor !== null
       && (typeof props.anchor !== 'object' || props.anchor.$$element !== true))
     if (domAnchor.length > 0) fail('a host menu received something other than a React element or null as its anchor')
