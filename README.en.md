@@ -124,7 +124,7 @@ The directory-picker service is mutually exclusive: the `native` backend offers 
 ## Install
 
 1. Client sidebar → **Plugins** → **Add plugin**.
-2. Enter `dsh-client-ui-workspace-suite@1.2.2` (or choose the local source directory).
+2. Enter `dsh-client-ui-workspace-suite@1.2.3` (or choose the local source directory).
 3. **Install** → **Enable now**; restart the client if it says the change takes effect on the next start.
 4. The card must read **Enabled / Mounted**. The workspace list then switches to the tree view.
 
@@ -162,7 +162,7 @@ Common causes: the client was not restarted; the package is missing from `dsh.pr
 
 > If the Plugins page still shows the 1.2.0-era failure `(@deepseek-ai/dsh-host-directory-picker-browse): Error: service "directoryPicker" has been registered at <NativeDirectoryPicker>`, that was a live enable racing the old static pair. 1.2.1 mounts the pair only after the seam is free; upgrade to 1.2.1 and restart the client once to clear the stale failure state.
 >
-> If a menu appears in the window's bottom-right corner, the portaled list lost its anchor: since 0.2.2 the host `Menu` anchors through `anchorRef` (the old `getAnchorRect` is silently ignored). 1.2.2 passes an anchor ref from every row menu and from the conversation workspace menu, so the list no longer falls back to the window corner.
+> If a menu appears in the window's bottom-right corner: the menu's anchor (the "More" button) lives in a strip that is rendered only while the row is hovered, so moving into the portaled menu hides the anchor and the list falls back to the CSS default corner. Since 1.2.3 the strip stays rendered while its menu is open (and the row time stays hidden), so the anchor no longer disappears.
 
 ## Development
 

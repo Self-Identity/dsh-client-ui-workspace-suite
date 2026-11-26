@@ -2,6 +2,16 @@
 
 本项目遵循语义化版本；每个版本对应 `package.json` 的 `version`。
 
+## 1.2.3 — 2026-11-27
+
+修复「更多」菜单在鼠标移入菜单或点击菜单项时跳到窗口右下角的问题（1.2.2 的锚点迁移是必要但不充分的）。
+
+### 修复
+
+- **根因**：DSH 0.2.2 起宿主 `Menu` 用 CSS 锚点定位（`anchorRef`），列表跟随锚点元素。插件的「更多」按钮位于 `.dws-rowActions` 中，而该操作条只在行 `:hover` 时显示（`display:none` 于其他时刻）。鼠标从行移入弹层菜单时行失去 hover，锚点元素被隐藏 → `anchor()` 失效 → portal 列表按 CSS 回退到 `bottom:12px; right:12px`，即窗口右下角；此时点击会落空，菜单保持打开，看起来就是「瞬移」。
+- **修复**：`RowMenu` 打开期间用 effect 把所在 `.dws-rowActions` 内联设为 `inline-flex`（并把行内时间隐藏，保持 hover 布局），关闭/卸载时恢复原值；另加 CSS 兜底 `.dws-rowActions:has(button[aria-expanded="true"]){display:inline-flex}` 与对应 `.dws-time` 隐藏规则。回退菜单路径同样受益（锚点在同一操作条内）。
+- **回归测试**：`tools/test-styles.mjs` 新增「菜单打开时操作条必须保持渲染」的规则守卫；在完整 desktop 组合（23 个工作区、真实会话数据）的隔离环境中实测：模拟 hover 丢失后菜单保持锚定（228,399），强制隐藏锚点时可复现右下角回退（1284,744），恢复后回到锚点，点击菜单项可正常关闭。
+
 ## 1.2.2 — 2026-11-27
 
 适配 `@deepseek-ai/dsh-desktop-runtime 0.2.2-rc.5` 的 Client UI 原语变更，修复「更多」菜单定位漂移。

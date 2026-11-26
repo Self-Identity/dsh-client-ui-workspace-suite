@@ -153,6 +153,14 @@
       '.dws-wsRow:hover .dws-rowActions,.dws-sessionRow:hover .dws-rowActions,',
       '.dws-rowActions:focus-within{display:inline-flex}',
       '.dws-wsRow:hover .dws-time,.dws-sessionRow:hover .dws-time{display:none}',
+      // A row's "more" menu is anchored with CSS anchor positioning, and its anchor
+      // lives inside this hover-only strip. Moving the pointer into the open menu
+      // un-hovers the row, which hides the anchor and makes the portaled list fall
+      // back to the window's bottom-right corner. Keep the strip (and the row's
+      // hover layout) rendered while its trigger reports an open menu.
+      '.dws-rowActions:has(button[aria-expanded="true"]){display:inline-flex}',
+      '.dws-wsRow:has(button[aria-expanded="true"]) .dws-time,',
+      '.dws-sessionRow:has(button[aria-expanded="true"]) .dws-time{display:none}',
       // Bottom fade of the tree area, matching the shipped session list.
       '.dws-fade{position:absolute;left:0;right:var(--dsh-session-list-edge-inset,0px);bottom:0;height:24px;',
       'pointer-events:none;background:linear-gradient(to bottom,transparent,var(--dsw-specific-sidebar-fill))}',

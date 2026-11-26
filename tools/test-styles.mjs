@@ -94,6 +94,15 @@ if (checked < 60) fail('expected the stylesheet to define at least 60 rules; fou
 if (!css.includes('focus-visible')) fail('no :focus-visible styling; keyboard focus would be invisible')
 if (!css.includes('outline')) fail('no focus outline declared')
 
+// A row's "more" menu is anchored with CSS anchor positioning, and its anchor
+// lives in the hover-only action strip. If the strip hides while the menu is
+// open, the anchor disappears and the portaled list falls back to the window's
+// bottom-right corner, so the strip must stay rendered while its trigger is
+// expanded (CSS `:has` plus the JS pin in RowMenu).
+if (!padded.includes('.dws-rowActions:has(button[aria-expanded="true"]){display:inline-flex}')) {
+  fail('the row action strip is not pinned open while its menu is expanded; the menu would jump to the window corner')
+}
+
 // The collapsed rail is 56px wide: its header must stack instead of rowing.
 if (!/\.dws-header--rail\{[^}]*flex-direction:column/.test(padded)) {
   fail('the rail header does not stack into a column; four icons would overflow the 56px rail')

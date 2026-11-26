@@ -124,7 +124,7 @@
 ## 安装
 
 1. 客户端侧边栏 → **插件** → **添加插件**。
-2. 填 `dsh-client-ui-workspace-suite@1.2.2`（或选择本地源码目录）。
+2. 填 `dsh-client-ui-workspace-suite@1.2.3`（或选择本地源码目录）。
 3. **安装** → **立即启用**；若提示「改动在下次启动生效」，重启客户端。
 4. 卡片显示 **已启用 / 已挂载**，工作区列表切换为树状视图。
 
@@ -162,7 +162,7 @@
 
 > 若插件页仍显示 1.2.0 时代的旧失败：`(@deepseek-ai/dsh-host-directory-picker-browse): Error: service "directoryPicker" has been registered at <NativeDirectoryPicker>`，说明那次热启用撞上了旧实现的两后端竞态。1.2.1 已改为等服务空闲后再挂载；升级到 1.2.1 后重启客户端一次即可清掉该失败状态。
 >
-> 若菜单出现在窗口右下角：说明 portal 菜单没有拿到锚点。0.2.2 起宿主 `Menu` 用 `anchorRef` 做 CSS 锚点定位，旧的 `getAnchorRect` 会被静默忽略；1.2.2 起所有行菜单与窗口工作区菜单都传入锚点 ref，不再回退到窗口角落。
+> 若菜单出现在窗口右下角：菜单锚点（「更多」按钮）位于只在行 hover 时显示的操作条里，鼠标移入菜单后行失去 hover、锚点被隐藏，portal 列表就会按 CSS 回退到窗口右下角。1.2.3 起菜单打开期间会保持操作条渲染（并隐藏行内时间），锚点不再消失。
 
 ## 开发
 

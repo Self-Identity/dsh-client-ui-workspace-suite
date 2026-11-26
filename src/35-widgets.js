@@ -389,6 +389,29 @@
         close()
         onSelect(id)
       }
+      // The trigger sits inside `.dws-rowActions`, a strip this plugin reveals only
+      // while the row is hovered. The host Menu anchors its portaled list with CSS
+      // anchor positioning, so hiding the trigger would drop the anchor and the
+      // list would fall back to the window's bottom-right corner. Pin the strip
+      // open (and keep the row in its hover layout) while this menu is open.
+      React.useEffect(() => {
+        if (open !== true) return undefined
+        const node = triggerRef.current
+        const actions = node !== null && node !== undefined && typeof node.closest === 'function'
+          ? node.closest('.dws-rowActions')
+          : null
+        if (actions === null) return undefined
+        const row = typeof actions.closest === 'function' ? actions.closest('.dws-wsRow, .dws-sessionRow') : null
+        const time = row === null ? null : row.querySelector('.dws-time')
+        const previousDisplay = actions.style.display
+        const previousTime = time === null ? null : time.style.display
+        actions.style.display = 'inline-flex'
+        if (time !== null) time.style.display = 'none'
+        return () => {
+          actions.style.display = previousDisplay
+          if (time !== null) time.style.display = previousTime === null ? '' : previousTime
+        }
+      }, [open])
       const own = () => E(React.Fragment, null, trigger,
         open === true
           ? E(FallbackMenu, { rect, items, label: menuLabel || label, onSelect: choose, onClose: close })
